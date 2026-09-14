@@ -1,8 +1,4 @@
-@class-prefix-switch: ~'am-switch';
-
-@switch-width: 51px;
-@switch-height: 31px;
-@switch-border: 2px;
+@class-prefix-switch: ~'adm-switch';
 
 @keyframes loading-rotate {
   100% {
@@ -11,6 +7,11 @@
 }
 
 .@{class-prefix-switch} {
+  --checked-color: var(--adm-color-primary);
+  --height: 31px;
+  --width: 51px;
+  --border-width: 2px;
+
   display: inline-block;
   vertical-align: middle;
   box-sizing: border-box;
@@ -23,22 +24,25 @@
   }
 
   &-checkbox {
-    width: @switch-width;
-    height: @switch-height;
+    min-width: var(--width);
+    height: var(--height);
     box-sizing: border-box;
     border-radius: 31px;
-    background: #e5e5e5;
+    background: var(--adm-color-border);
     z-index: 0;
+    overflow: hidden;
+    line-height: var(--height);
+
     &:before {
       content: ' ';
       position: absolute;
-      left: @switch-border;
-      top: @switch-border;
-      width: @switch-width - 2 * @switch-border;
-      height: @switch-height - 2 * @switch-border;
-      border-radius: @switch-height - 2 * @switch-border;
+      left: var(--border-width);
+      top: var(--border-width);
+      width: calc(100% - 2 * var(--border-width));
+      height: calc(var(--height) - 2 * var(--border-width));
+      border-radius: calc(var(--height) - 2 * var(--border-width));
       box-sizing: border-box;
-      background: #fff;
+      background: var(--adm-color-background);
       z-index: 1;
       transition: all 200ms;
       transform: scale(1);
@@ -49,30 +53,47 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    width: @switch-height - 2 * @switch-border;
-    height: @switch-height - 2 * @switch-border;
-    border-radius: @switch-height - 2 * @switch-border;
-    background: #fff;
+    width: calc(var(--height) - 2 * var(--border-width));
+    height: calc(var(--height) - 2 * var(--border-width));
+    border-radius: calc(var(--height) - 2 * var(--border-width));
+    background: var(--adm-color-text-light-solid);
     position: absolute;
     z-index: 2;
-    top: @switch-border;
-    left: @switch-border;
-    transform: translateX(0);
+    top: var(--border-width);
+    left: var(--border-width);
     transition: all 200ms;
     box-shadow: 0 0 2px 0 rgba(0, 0, 0, 0.2), 0 2px 11.5px 0 rgba(0, 0, 0, 0.08),
       -1px 2px 2px 0 rgba(0, 0, 0, 0.1);
   }
 
+  &-inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 8px 0 calc(var(--height) - var(--border-width) + 5px);
+    height: 100%;
+    color: var(--adm-color-weak);
+    transition: margin 200ms;
+    font-size: var(--adm-font-size-7);
+  }
+
   /* 选中状态 */
   &.@{class-prefix-switch}-checked {
     .@{class-prefix-switch}-checkbox {
-      background: #1677ff;
+      background: var(--checked-color);
       &:before {
         transform: scale(0);
       }
     }
     .@{class-prefix-switch}-handle {
-      transform: translateX(20px);
+      left: calc(100% - (var(--height) - var(--border-width)));
+    }
+
+    .@{class-prefix-switch}-inner {
+      margin: 0 calc(var(--height) - var(--border-width) + 5px) 0 8px;
+      color: var(--adm-color-text-light-solid);
     }
   }
 
@@ -83,7 +104,7 @@
   }
 
   /* loading图标 */
-  &-icon {
+  &-spin-icon {
     width: 14px;
     height: 14px;
     animation: loading-rotate 1s linear infinite;

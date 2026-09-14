@@ -1,8 +1,38 @@
-const tester = document.createElement('div')
-tester.className = 'am-one-px-tester'
-document.body.appendChild(tester)
+import { canUseDom } from './can-use-dom'
+import { devError } from './dev-log'
+import { isDev } from './is-dev'
+
+let tenPxTester: HTMLDivElement | null = null
+let tester: HTMLDivElement | null = null
+
+function initialize() {
+  if (tenPxTester !== null) return
+  if (!canUseDom || !document.body) return
+  tenPxTester = document.createElement('div')
+  tenPxTester.className = 'adm-px-tester'
+  tenPxTester.style.setProperty('--size', '10')
+  document.body.appendChild(tenPxTester)
+  tester = document.createElement('div')
+  tester.className = 'adm-px-tester'
+  document.body.appendChild(tester)
+  if (isDev) {
+    if (window.getComputedStyle(tester).position !== 'fixed') {
+      devError(
+        'Global',
+        'The px tester is not rendering properly. Please make sure you have imported `antd-mobile/es/global`.'
+      )
+    }
+  }
+}
 
 export function convertPx(px: number) {
-  const ratio = tester.getBoundingClientRect().height || 1
-  return px * ratio
+  if (tenPxTester === null) {
+    initialize()
+  }
+  if (tenPxTester === null || tester === null) return px
+  if (tenPxTester.getBoundingClientRect().height === 10) {
+    return px
+  }
+  tester.style.setProperty('--size', px.toString())
+  return tester.getBoundingClientRect().height
 }

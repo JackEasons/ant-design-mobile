@@ -1,14 +1,17 @@
 import React, { useMemo, useRef } from 'react'
-import { ElementProps } from '../../utils/element-props'
+import type { FC, ReactNode } from 'react'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
 import classNames from 'classnames'
 import Ticks from './ticks'
 import Marks, { SliderMarks } from './marks'
+import getMiniDecimal, { toFixed } from '@rc-component/mini-decimal'
 import Thumb from './thumb'
-import { withDefaultProps } from '../../utils/with-default-props'
+import { mergeProps } from '../../utils/with-default-props'
 import { nearest } from '../../utils/nearest'
-import { useNewControllableValue } from '../../utils/use-controllable-value'
+import { usePropsValue } from '../../utils/use-props-value'
+import { devWarning } from '../../utils/dev-log'
 
-const classPrefix = `am-slider`
+const classPrefix = `adm-slider`
 
 export type SliderValue = number | [number, number]
 
@@ -22,9 +25,12 @@ export type SliderProps = {
   ticks?: boolean
   disabled?: boolean
   range?: boolean
+  icon?: ReactNode
+  popover?: boolean | ((value: number) => ReactNode)
+  residentPopover?: boolean
   onChange?: (value: SliderValue) => void
   onAfterChange?: (value: SliderValue) => void
-} & ElementProps
+} & NativeProps<'--fill-color'>
 
 const defaultProps = {
   min: 0,
@@ -33,10 +39,13 @@ const defaultProps = {
   ticks: false,
   range: false,
   disabled: false,
+  popover: false,
+  residentPopover: false,
 }
 
-export const Slider = withDefaultProps(defaultProps)<SliderProps>(props => {
-  const { min, max, disabled, marks, ticks, step } = props
+export const Slider: FC<SliderProps> = p => {
+  const props = mergeProps(defaultProps, p)
+  const { min, max, disabled, marks, ticks, step, icon } = props
 
   function sortValue(val: [number, number]): [number, number] {
     return val.sort((a, b) => a - b)
@@ -44,16 +53,42 @@ export const Slider = withDefaultProps(defaultProps)<SliderProps>(props => {
   function convertValue(value: SliderValue): [number, number] {
     return (props.range ? value : [props.min, value]) as any
   }
+  function alignValue(value: number, decimalLen: number) {
+    const decimal = getMiniDecimal(value)
+    const fixedStr = toFixed(decimal.toString(), '.', decimalLen)
+
+    return getMiniDecimal(fixedStr).toNumber()
+  }
+
   function reverseValue(value: [number, number]): SliderValue {
-    return props.range ? value : value[1]
+    const mergedDecimalLen = Math.max(
+      getDecimalLen(step),
+      getDecimalLen(value[0]),
+      getDecimalLen(value[1])
+    )
+    return props.range
+      ? (value.map(v => alignValue(v, mergedDecimalLen)) as [number, number])
+      : alignValue(value[1], mergedDecimalLen)
+  }
+
+  function getDecimalLen(n: number) {
+    return (`${n}`.split('.')[1] || '').length
   }
 
   function onAfterChange(value: [number, number]) {
     props.onAfterChange?.(reverseValue(value))
   }
 
-  const [rawValue, setRawValue] = useNewControllableValue<SliderValue>({
-    value: props.value,
+  let propsValue: SliderValue | undefined = props.value
+  if (props.range && typeof props.value === 'number') {
+    devWarning(
+      'Slider',
+      'When `range` prop is enabled, the `value` prop should be an array, like: [0, 0]'
+    )
+    propsValue = [0, props.value]
+  }
+  const [rawValue, setRawValue] = usePropsValue<SliderValue>({
+    value: propsValue,
     defaultValue: props.defaultValue ?? (props.range ? [min, min] : min),
     onChange: props.onChange,
   })
@@ -77,13 +112,19 @@ export const Slider = withDefaultProps(defaultProps)<SliderProps>(props => {
       return Object.keys(marks)
         .map(parseFloat)
         .sort((a, b) => a - b)
-    } else {
+    } else if (ticks) {
       const points: number[] = []
-      for (let i = min; i <= max; i += step) {
-        points.push(i)
+      for (
+        let i = getMiniDecimal(min);
+        i.lessEquals(getMiniDecimal(max));
+        i = i.add(step)
+      ) {
+        points.push(i.toNumber())
       }
       return points
     }
+
+    return []
   }, [marks, ticks, step, min, max])
 
   function getValueByPosition(position: number) {
@@ -95,9 +136,10 @@ export const Slider = withDefaultProps(defaultProps)<SliderProps>(props => {
     if (pointList.length) {
       value = nearest(pointList, newPosition)
     } else {
-      const lengthPerStep = 100 / ((max - min) / step!)
-      const steps = Math.round(newPosition / lengthPerStep)
-      value = steps * lengthPerStep * (max - min) * 0.01 + min
+      // 使用 MiniDecimal 避免精度问题
+      const cell = Math.round((newPosition - min) / step)
+      const nextVal = getMiniDecimal(cell).multi(step)
+      value = getMiniDecimal(min).add(nextVal.toString()).toNumber()
     }
     return value
   }
@@ -108,10 +150,11 @@ export const Slider = withDefaultProps(defaultProps)<SliderProps>(props => {
     if (dragLockRef.current > 0) return
     event.stopPropagation()
     if (disabled) return
-    const sliderOffsetLeft = trackRef.current!.getBoundingClientRect().left
+    const track = trackRef.current
+    if (!track) return
+    const sliderOffsetLeft = track.getBoundingClientRect().left
     const position =
-      ((event.clientX - sliderOffsetLeft) /
-        Math.ceil(trackRef.current!.offsetWidth)) *
+      ((event.clientX - sliderOffsetLeft) / Math.ceil(track.offsetWidth)) *
         (max - min) +
       min
 
@@ -145,6 +188,9 @@ export const Slider = withDefaultProps(defaultProps)<SliderProps>(props => {
         max={max}
         disabled={disabled}
         trackRef={trackRef}
+        icon={icon}
+        popover={props.popover}
+        residentPopover={props.residentPopover}
         onDrag={(position, first, last) => {
           if (first) {
             dragLockRef.current += 1
@@ -163,20 +209,17 @@ export const Slider = withDefaultProps(defaultProps)<SliderProps>(props => {
             }, 100)
           }
         }}
+        aria-label={props['aria-label']}
       />
     )
   }
 
-  return (
+  return withNativeProps(
+    props,
     <div
-      className={classNames(
-        classPrefix,
-        {
-          [`${classPrefix}-disabled`]: disabled,
-        },
-        props.className
-      )}
-      style={props.style}
+      className={classNames(classPrefix, {
+        [`${classPrefix}-disabled`]: disabled,
+      })}
     >
       <div className={`${classPrefix}-track-container`} onClick={onTrackClick}>
         <div
@@ -215,4 +258,4 @@ export const Slider = withDefaultProps(defaultProps)<SliderProps>(props => {
       )}
     </div>
   )
-})
+}

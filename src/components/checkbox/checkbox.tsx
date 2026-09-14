@@ -1,12 +1,17 @@
-import React, { FC, useContext } from 'react'
-import { ElementProps } from '../../utils/element-props'
+import React, { forwardRef, useContext, useImperativeHandle } from 'react'
+import type { ReactNode } from 'react'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
 import classNames from 'classnames'
-import { CheckOutlined } from '@ant-design/icons'
 import { CheckboxGroupContext } from './group-context'
-import { useNewControllableValue } from '../../utils/use-controllable-value'
+import { usePropsValue } from '../../utils/use-props-value'
 import { mergeProps } from '../../utils/with-default-props'
+import { devWarning } from '../../utils/dev-log'
+import { CheckIcon } from './check-icon'
+import { IndeterminateIcon } from './indeterminate-icon'
+import { isDev } from '../../utils/is-dev'
+import { NativeInput } from './native-input'
 
-const classPrefix = `am-checkbox`
+const classPrefix = `adm-checkbox`
 
 export type CheckboxValue = string | number
 
@@ -18,25 +23,52 @@ export type CheckboxProps = {
   value?: CheckboxValue
   indeterminate?: boolean
   block?: boolean
-} & ElementProps
+  id?: string
+  icon?: (checked: boolean, indeterminate: boolean) => ReactNode
+  children?: ReactNode
+  onClick?: (event: React.MouseEvent<HTMLLabelElement, MouseEvent>) => void
+} & NativeProps<'--icon-size' | '--font-size' | '--gap'>
 
 const defaultProps = {
   defaultChecked: false,
+  indeterminate: false,
 }
 
-export const Checkbox: FC<CheckboxProps> = p => {
-  const props = mergeProps(defaultProps, p)
+export type CheckboxRef = {
+  check: () => void
+  uncheck: () => void
+  toggle: () => void
+}
+
+export const Checkbox = forwardRef<CheckboxRef, CheckboxProps>((p, ref) => {
   const groupContext = useContext(CheckboxGroupContext)
 
-  let [checked, setChecked] = useNewControllableValue({
+  const props = mergeProps(defaultProps, p)
+
+  let [checked, setChecked] = usePropsValue({
     value: props.checked,
     defaultValue: props.defaultChecked,
     onChange: props.onChange,
-  })
+  }) as [boolean, (v: boolean) => void]
   let disabled = props.disabled
 
   const { value } = props
   if (groupContext && value !== undefined) {
+    if (isDev) {
+      if (p.checked !== undefined) {
+        devWarning(
+          'Checkbox',
+          'When used within `Checkbox.Group`, the `checked` prop of `Checkbox` will not work.'
+        )
+      }
+      if (p.defaultChecked !== undefined) {
+        devWarning(
+          'Checkbox',
+          'When used within `Checkbox.Group`, the `defaultChecked` prop of `Checkbox` will not work.'
+        )
+      }
+    }
+
     checked = groupContext.value.includes(value)
     setChecked = (checked: boolean) => {
       if (checked) {
@@ -49,35 +81,56 @@ export const Checkbox: FC<CheckboxProps> = p => {
     disabled = disabled || groupContext.disabled
   }
 
-  return (
+  useImperativeHandle(ref, () => ({
+    check: () => {
+      setChecked(true)
+    },
+    uncheck: () => {
+      setChecked(false)
+    },
+    toggle: () => {
+      setChecked(!checked)
+    },
+  }))
+
+  const renderIcon = () => {
+    if (props.icon) {
+      return (
+        <div className={`${classPrefix}-custom-icon`}>
+          {props.icon(checked, props.indeterminate)}
+        </div>
+      )
+    }
+
+    return (
+      <div className={`${classPrefix}-icon`}>
+        {props.indeterminate ? <IndeterminateIcon /> : checked && <CheckIcon />}
+      </div>
+    )
+  }
+
+  return withNativeProps(
+    props,
     <label
-      className={classNames(classPrefix, props.className, {
-        [`${classPrefix}-checked`]: checked,
+      onClick={props.onClick}
+      className={classNames(classPrefix, {
+        [`${classPrefix}-checked`]: checked && !props.indeterminate,
         [`${classPrefix}-indeterminate`]: props.indeterminate,
         [`${classPrefix}-disabled`]: disabled,
         [`${classPrefix}-block`]: props.block,
       })}
-      style={props.style}
     >
-      <input
+      <NativeInput
         type='checkbox'
         checked={checked}
-        onChange={e => {
-          setChecked(e.target.checked)
-        }}
-        onClick={e => {
-          e.stopPropagation()
-          e.nativeEvent.stopImmediatePropagation()
-        }}
+        onChange={setChecked}
         disabled={disabled}
+        id={props.id}
       />
-      <div className={`${classPrefix}-icon`}>
-        <CheckOutlined className={`${classPrefix}-icon-checked`} />
-        <div className={`${classPrefix}-indeterminate-checked`} />
-      </div>
+      {renderIcon()}
       {props.children && (
         <div className={`${classPrefix}-content`}>{props.children}</div>
       )}
     </label>
   )
-}
+})

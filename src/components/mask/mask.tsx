@@ -1,12 +1,32 @@
-import { ElementProps } from '../../utils/element-props'
-import { useInitialized } from '../../utils/use-initialized'
-import classNames from 'classnames'
-import React, { useRef } from 'react'
-import { createPortal } from 'react-dom'
-import { CSSTransition } from 'react-transition-group'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
+import React, { useMemo, useRef, useState } from 'react'
+import type { FC, ReactNode } from 'react'
+import { useUnmountedRef } from 'ahooks'
 import { useLockScroll } from '../../utils/use-lock-scroll'
+import { useSpring, animated } from '@react-spring/web'
+import {
+  renderToContainer,
+  GetContainer,
+} from '../../utils/render-to-container'
+import { mergeProps } from '../../utils/with-default-props'
+import { useConfig } from '../config-provider'
+import { ShouldRender } from '../../utils/should-render'
+import {
+  PropagationEvent,
+  withStopPropagation,
+} from '../../utils/with-stop-propagation'
 
-const classPrefix = `am-mask`
+const classPrefix = `adm-mask`
+
+const opacityRecord = {
+  default: 0.55,
+  thin: 0.35,
+  thick: 0.75,
+}
+const colorRecord: Record<string, string> = {
+  black: '0, 0, 0',
+  white: '255, 255, 255',
+}
 
 export type MaskProps = {
   visible?: boolean
@@ -14,71 +34,106 @@ export type MaskProps = {
   destroyOnClose?: boolean
   forceRender?: boolean
   disableBodyScroll?: boolean
-  opacity?: 'default' | 'dark' | number
-  getContainer?: HTMLElement | (() => HTMLElement) | undefined
+  color?: 'white' | 'black' | (string & {})
+  opacity?: 'default' | 'thin' | 'thick' | number
+  getContainer?: GetContainer
+  afterShow?: () => void
   afterClose?: () => void
-} & ElementProps
+  stopPropagation?: PropagationEvent[]
+  children?: ReactNode
+} & NativeProps<'--z-index'>
 
-export const Mask: React.FC<MaskProps> = props => {
-  const cls = classNames(classPrefix, props.className, {
-    [`${classPrefix}-hidden`]: !props.visible,
-  })
-
-  const initialized = useInitialized(props.visible || props.forceRender)
-
-  const ref = useRef<HTMLDivElement>(null)
-
-  useLockScroll(ref, !!(props.visible && props.disableBodyScroll))
-
-  function handleClick(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
-    if (e.currentTarget === e.target) {
-      props.onMaskClick?.(e)
-    }
-  }
-
-  const opacity =
-    props.opacity === 'default'
-      ? 0.55
-      : props.opacity === 'dark'
-      ? 0.75
-      : props.opacity
-
-  const node = (
-    <CSSTransition
-      in={props.visible}
-      timeout={200}
-      classNames={classPrefix}
-      onExited={props.afterClose}
-      unmountOnExit={props.destroyOnClose}
-    >
-      <div
-        className={cls}
-        onClick={handleClick}
-        ref={ref}
-        style={{
-          ...props.style,
-          backgroundColor: `rgba(0, 0, 0, ${opacity})`,
-        }}
-      >
-        {initialized && props.children}
-      </div>
-    </CSSTransition>
-  )
-
-  if (props.getContainer) {
-    const container =
-      typeof props.getContainer === 'function'
-        ? props.getContainer()
-        : props.getContainer
-    return createPortal(node, container)
-  }
-  return node
-}
-
-Mask.defaultProps = {
+const defaultProps = {
   visible: true,
   destroyOnClose: false,
   forceRender: false,
+  color: 'black',
   opacity: 'default',
   disableBodyScroll: true,
+  getContainer: null,
+  stopPropagation: ['click'],
+}
+
+export const Mask: FC<MaskProps> = p => {
+  const props = mergeProps(defaultProps, p)
+  const { locale } = useConfig()
+
+  const ref = useRef<HTMLDivElement>(null)
+
+  useLockScroll(ref, props.visible && props.disableBodyScroll)
+
+  const background = useMemo(() => {
+    const opacity = opacityRecord[props.opacity] ?? props.opacity
+    const rgb = colorRecord[props.color]
+    return rgb ? `rgba(${rgb}, ${opacity})` : props.color
+  }, [props.color, props.opacity])
+
+  const [active, setActive] = useState(props.visible)
+
+  const unmountedRef = useUnmountedRef()
+  const { opacity } = useSpring({
+    opacity: props.visible ? 1 : 0,
+    config: {
+      precision: 0.01,
+      mass: 1,
+      tension: 250,
+      friction: 30,
+      clamp: true,
+    },
+    onStart: () => {
+      setActive(true)
+    },
+    onRest: () => {
+      if (unmountedRef.current) return
+      setActive(props.visible)
+      if (props.visible) {
+        props.afterShow?.()
+      } else {
+        props.afterClose?.()
+      }
+    },
+  })
+
+  const node = withStopPropagation(
+    props.stopPropagation,
+    withNativeProps(
+      props,
+      <animated.div
+        className={classPrefix}
+        ref={ref}
+        aria-hidden
+        style={{
+          ...props.style,
+          background,
+          opacity,
+          display: active ? undefined : 'none',
+        }}
+        onClick={(e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+          if (e.target === e.currentTarget) {
+            props.onMaskClick?.(e)
+          }
+        }}
+      >
+        {props.onMaskClick && (
+          <div
+            className={`${classPrefix}-aria-button`}
+            role='button'
+            aria-label={locale.Mask.name}
+            onClick={props.onMaskClick}
+          />
+        )}
+        <div className={`${classPrefix}-content`}>{props.children}</div>
+      </animated.div>
+    )
+  )
+
+  return (
+    <ShouldRender
+      active={active}
+      forceRender={props.forceRender}
+      destroyOnClose={props.destroyOnClose}
+    >
+      {renderToContainer(props.getContainer, node)}
+    </ShouldRender>
+  )
 }

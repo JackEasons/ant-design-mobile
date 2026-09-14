@@ -1,27 +1,33 @@
-.am-drawer {
+.adm-floating-panel {
   --border-radius: 8px;
   --header-height: 28px;
+  --z-index: var(--adm-floating-panel-z-index, 900);
 
-  border-top-left-radius: var(--border-radius);
-  border-top-right-radius: var(--border-radius);
-  background: var(--am-color-white);
   position: fixed;
-  z-index: var(--am-z-index-floating-panel);
-  top: 100vh;
+  z-index: var(--z-index);
   left: 0;
   width: 100vw;
   display: flex;
   flex-direction: column;
+  touch-action: none;
+  &-mask {
+    display: block;
+    width: 100%;
+    height: 100vh;
+    position: absolute;
+    left: 0;
+    top: -100vh;
+    background: transparent;
+  }
   &::after {
     content: '';
     display: block;
     position: absolute;
-    bottom: -100vh;
     height: 100vh;
     width: 100vw;
-    background: var(--am-color-white);
+    background: var(--adm-color-background);
   }
-  .am-drawer-header {
+  .adm-floating-panel-header {
     flex: none;
     height: var(--header-height);
     display: flex;
@@ -29,16 +35,35 @@
     align-items: center;
     cursor: grab;
     user-select: none;
-    //pointer-events: none;
-    .am-drawer-bar {
+    background-color: var(--adm-color-background);
+    border-top-left-radius: var(--border-radius);
+    border-top-right-radius: var(--border-radius);
+
+    .adm-floating-panel-bar {
       height: 3px;
       width: 20px;
       border-radius: 10px;
-      background: var(--am-color-light);
+      background: var(--adm-color-light);
     }
   }
-  .am-drawer-content {
+  .adm-floating-panel-content {
     flex: 1;
     overflow-y: scroll;
+    background: var(--adm-color-background);
+  }
+
+  // Position
+  &-top {
+    top: 0;
+    &::after {
+      top: -100vh;
+    }
+  }
+
+  &-bottom {
+    bottom: 0;
+    &::after {
+      bottom: -100vh;
+    }
   }
 }

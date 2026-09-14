@@ -1,57 +1,89 @@
-import React, { FC } from 'react'
-import { useDrag } from 'react-use-gesture'
-import { useSpring, animated } from '@react-spring/web'
-import { Slide } from './slide'
+import { animated, useSpring } from '@react-spring/web'
+import { useDrag } from '@use-gesture/react'
+import React, {
+  ReactNode,
+  RefObject,
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+} from 'react'
+import { bound } from '../../utils/bound'
 import { convertPx } from '../../utils/convert-px'
-import { bound } from '../../utils/rubberband'
+import { Slide } from './slide'
 
-const classPrefix = `am-image-viewer`
+const classPrefix = `adm-image-viewer`
 
-export const Slides: FC<{
+export type SlidesType = {
   images: string[]
-  onTap: () => void
+  onTap?: () => void
   maxZoom: number
   defaultIndex: number
   onIndexChange?: (index: number) => void
-}> = props => {
-  const slideWidth = window.innerWidth + convertPx(16)
+  imageRender?: (
+    image: string,
+    { ref, index }: { ref: RefObject<HTMLImageElement>; index: number }
+  ) => ReactNode
+}
+export type SlidesRef = {
+  swipeTo: (index: number, immediate?: boolean) => void
+}
 
+export const Slides = forwardRef<SlidesRef, SlidesType>((props, ref) => {
+  const slideWidth = window.innerWidth + convertPx(16)
   const [{ x }, api] = useSpring(() => ({
-    x: -props.defaultIndex * slideWidth,
-    config: { tension: 300 },
+    x: props.defaultIndex * slideWidth,
+    config: { tension: 250, clamp: true },
   }))
 
   const count = props.images.length
 
+  function swipeTo(index: number, immediate = false) {
+    const i = bound(index, 0, count - 1)
+    props.onIndexChange?.(i)
+    api.start({
+      x: i * slideWidth,
+      immediate,
+    })
+  }
+
+  useImperativeHandle(ref, () => ({
+    swipeTo,
+  }))
+
+  const dragLockRef = useRef(false)
   const bind = useDrag(
     state => {
-      const [mx] = state.movement
+      if (dragLockRef.current) return
+      const [offsetX] = state.offset
       if (state.last) {
-        const index = bound(
-          -Math.round((mx + state.vxvy[0] * 100) / slideWidth),
-          0,
-          count - 1
+        const minIndex = Math.floor(offsetX / slideWidth)
+        const maxIndex = minIndex + 1
+        const velocityOffset =
+          Math.min(state.velocity[0] * 2000, slideWidth) * state.direction[0]
+        swipeTo(
+          bound(
+            Math.round((offsetX + velocityOffset) / slideWidth),
+            minIndex,
+            maxIndex
+          )
         )
-        api.start({
-          x: index * -slideWidth,
-        })
       } else {
         api.start({
-          x: mx,
+          x: offsetX,
+          immediate: true,
         })
       }
     },
     {
-      initial: () => [x.get(), 0],
-      bounds: () => {
-        const index: number = -Math.round(x.get() / slideWidth)
-        return {
-          right: Math.max(index - 1, 0) * -slideWidth,
-          left: Math.min(index + 1, count - 1) * -slideWidth,
-        }
-      },
+      transform: ([x, y]) => [-x, y],
+      from: () => [x.get(), 0],
+      bounds: () => ({
+        left: 0,
+        right: (count - 1) * slideWidth,
+      }),
       rubberband: true,
       axis: 'x',
+      pointer: { touch: true },
     }
   )
 
@@ -59,28 +91,34 @@ export const Slides: FC<{
     <div className={`${classPrefix}-slides`} {...bind()}>
       <animated.div className={`${classPrefix}-indicator`}>
         {x.to(v => {
-          const index: number = -Math.round(v / slideWidth)
+          const index: number = bound(Math.round(v / slideWidth), 0, count - 1)
           return `${index + 1} / ${count}`
         })}
       </animated.div>
-      <animated.div className={`${classPrefix}-slides-inner`} style={{ x }}>
-        {props.images.map(image => (
+      <animated.div
+        className={`${classPrefix}-slides-inner`}
+        style={{ x: x.to(x => -x) }}
+      >
+        {props.images.map((image, index) => (
           <Slide
-            key={image}
+            key={index}
             image={image}
             onTap={props.onTap}
             maxZoom={props.maxZoom}
+            imageRender={props.imageRender}
+            index={index}
             onZoomChange={zoom => {
               if (zoom !== 1) {
-                const index: number = -Math.round(x.get() / slideWidth)
+                const index: number = Math.round(x.get() / slideWidth)
                 api.start({
-                  x: index * -slideWidth,
+                  x: index * slideWidth,
                 })
               }
             }}
+            dragLockRef={dragLockRef}
           />
         ))}
       </animated.div>
     </div>
   )
-}
+})

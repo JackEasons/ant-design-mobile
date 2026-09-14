@@ -1,9 +1,14 @@
-import { Button, WaterMark } from 'antd-mobile'
 import React, { useState } from 'react'
+import { Button, WaterMark } from 'antd-mobile'
+
 import './demo1.less'
 
 const textProps = {
   content: 'Ant Design Mobile',
+}
+
+const rowsTextProps = {
+  content: ['Ant Design Mobile', 'Ant Design Mobile Pro'],
 }
 
 const imageProps = {
@@ -21,6 +26,8 @@ export default () => {
   return (
     <div className='water-mark-overlay'>
       <Button onClick={() => setProps(textProps)}>普通水印</Button>
+      <br />
+      <Button onClick={() => setProps(rowsTextProps)}>多行文字水印</Button>
       <br />
       <Button onClick={() => setProps(imageProps)}>图片水印</Button>
       <WaterMark {...props} />

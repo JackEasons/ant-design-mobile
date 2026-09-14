@@ -3,10 +3,11 @@ module.exports = {
   trailingComma: 'es5',
   tabWidth: 2,
   singleQuote: true,
-  jsxBracketSameLine: false,
+  bracketSameLine: false,
   jsxSingleQuote: true,
   quoteProps: 'preserve',
   arrowParens: 'avoid',
+  proseWrap: 'never',
   overrides: [
     {
       'files': ['*.md'],

@@ -1,40 +1,37 @@
-import React, { ReactNode, useMemo } from 'react'
+import { CheckOutline, CloseOutline } from 'antd-mobile-icons'
 import classNames from 'classnames'
-import { CheckOutlined, CloseOutlined } from '@ant-design/icons'
-import Loading from '../loading'
-import Mask from '../mask'
+import type { FC, ReactNode } from 'react'
+import React, { useMemo } from 'react'
+import { GetContainer } from '../../utils/render-to-container'
 import { mergeProps } from '../../utils/with-default-props'
+import { PropagationEvent } from '../../utils/with-stop-propagation'
+import AutoCenter from '../auto-center'
+import type { MaskProps } from '../mask'
+import Mask from '../mask'
+import SpinLoading from '../spin-loading'
 
-const classPrefix = `am-toast`
+const classPrefix = `adm-toast`
 
 export interface ToastProps {
-  /** Toast 完全关闭后的回调 */
   afterClose?: () => void
-  /** Toast 遮罩样式 */
-  maskStyle?: React.CSSProperties
-  /** Toast 遮罩类名 */
+  maskStyle?: MaskProps['style']
   maskClassName?: string
-  /** 是否允许背景点击 */
   maskClickable?: boolean
-  /** toast 文本内容 */
   content?: ReactNode
-  /** toast 图标 */
-  icon?: 'success' | 'fail' | 'loading' | React.ReactNode
-  /** 提示持续时间，若为 0 则不会自动关闭 */
+  icon?: 'success' | 'fail' | 'loading' | ReactNode
   duration?: number
-  /** 垂直方向显示位置，默认为 center */
   position?: 'top' | 'bottom' | 'center'
-  /** 是否显示 */
   visible?: boolean
-  /** 轻提示弹出时的的父容器 */
-  getContainer?: HTMLElement | (() => HTMLElement)
+  getContainer?: GetContainer
+  stopPropagation?: PropagationEvent[]
 }
 
 const defaultProps = {
   maskClickable: true,
+  stopPropagation: ['click'],
 }
 
-export const InternalToast: React.FC<ToastProps> = p => {
+export const InternalToast: FC<ToastProps> = p => {
   const props = mergeProps(defaultProps, p)
   const { maskClickable, content, icon, position } = props
 
@@ -42,11 +39,13 @@ export const InternalToast: React.FC<ToastProps> = p => {
     if (icon === null || icon === undefined) return null
     switch (icon) {
       case 'success':
-        return <CheckOutlined />
+        return <CheckOutline className={`${classPrefix}-icon-success`} />
       case 'fail':
-        return <CloseOutlined />
+        return <CloseOutline className={`${classPrefix}-icon-fail`} />
       case 'loading':
-        return <Loading color='white' />
+        return (
+          <SpinLoading color='white' className={`${classPrefix}-loading`} />
+        )
       default:
         return icon
     }
@@ -72,22 +71,25 @@ export const InternalToast: React.FC<ToastProps> = p => {
       getContainer={props.getContainer}
       afterClose={props.afterClose}
       style={{
-        pointerEvents: maskClickable ? 'none' : 'all',
+        pointerEvents: maskClickable ? 'none' : 'auto',
         ...props.maskStyle,
       }}
       className={classNames(`${classPrefix}-mask`, props.maskClassName)}
+      stopPropagation={props.stopPropagation}
     >
-      <div
-        style={{ top }}
-        className={classNames(
-          `${classPrefix}-wrap`,
-          icon ? `${classPrefix}-wrap-icon` : `${classPrefix}-wrap-text`
-        )}
-      >
-        {iconElement && (
-          <div className={`${classPrefix}-icon`}>{iconElement}</div>
-        )}
-        {content}
+      <div className={classNames(`${classPrefix}-wrap`)}>
+        <div
+          style={{ top }}
+          className={classNames(
+            `${classPrefix}-main`,
+            icon ? `${classPrefix}-main-icon` : `${classPrefix}-main-text`
+          )}
+        >
+          {iconElement && (
+            <div className={`${classPrefix}-icon`}>{iconElement}</div>
+          )}
+          <AutoCenter>{content}</AutoCenter>
+        </div>
       </div>
     </Mask>
   )

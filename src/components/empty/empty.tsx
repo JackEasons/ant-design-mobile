@@ -1,27 +1,48 @@
-import React, { ReactNode, FC } from 'react'
+import React from 'react'
+import type { FC, ReactNode, CSSProperties } from 'react'
 import classNames from 'classnames'
-import { ElementProps } from '../../utils/element-props'
-import EmptyIcon from '../../assets/empty-icon.svg'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
+import { EmptyIcon } from './empty-icon'
 
-const classPrefix = `am-empty`
+const classPrefix = `adm-empty`
 
 export type EmptyProps = {
-  imageStyle?: React.CSSProperties
+  image?: ReactNode
+  imageStyle?: CSSProperties
   description?: ReactNode
-} & ElementProps
+} & NativeProps
 
+/** @deprecated Empty has been deprecated and will be removed in the next major version. */
 export const Empty: FC<EmptyProps> = props => {
-  return (
-    <div
-      style={props.style}
-      className={classNames(classPrefix, props.className)}
-    >
-      <img
-        className={classNames(`${classPrefix}-image`)}
-        src={EmptyIcon}
-        alt='empty'
-        style={props.imageStyle}
-      />
+  function renderImageNode() {
+    const { image } = props
+    if (image === undefined) {
+      return (
+        <EmptyIcon
+          className={`${classPrefix}-image`}
+          style={props.imageStyle}
+        />
+      )
+    }
+    if (typeof image === 'string') {
+      return (
+        <img
+          className={`${classPrefix}-image`}
+          style={props.imageStyle}
+          src={image}
+          alt='empty'
+        />
+      )
+    }
+    return image
+  }
+
+  return withNativeProps(
+    props,
+    <div className={classPrefix}>
+      <div className={`${classPrefix}-image-container`}>
+        {renderImageNode()}
+      </div>
       {props.description && (
         <div className={classNames(`${classPrefix}-description`)}>
           {props.description}

@@ -1,57 +1,60 @@
 import classNames from 'classnames'
 import React from 'react'
-import { convertPx } from '../../utils/convert-px'
-import { ElementProps } from '../../utils/element-props'
-import { withDefaultProps } from '../../utils/with-default-props'
+import type { FC, ReactNode, CSSProperties } from 'react'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
 
-const classPrefix = `am-badge`
+const classPrefix = `adm-badge`
+
+export const dot = <React.Fragment />
 
 export type BadgeProps = {
-  content?: React.ReactNode
+  content?: ReactNode | typeof dot
   color?: string
-  offset?: [number, number]
-} & ElementProps
+  bordered?: boolean
+  children?: ReactNode
+  wrapperClassName?: string
+  wrapperStyle?: CSSProperties
+} & NativeProps<'--right' | '--top' | '--color'>
 
-export const Badge = withDefaultProps({
-  color: '#FF411C',
-  offset: [0, 0],
-})<BadgeProps>(props => {
-  const { content, color, offset, children } = props
+export const Badge: FC<BadgeProps> = props => {
+  const { content, color, children } = props
 
-  const badgeStyle = children
-    ? {
-        right: `${-convertPx(offset[0])}px`,
-        top: `${convertPx(offset[1])}px`,
-        backgroundColor: color,
-      }
-    : {
-        backgroundColor: color,
-      }
+  const isDot = content === dot
 
-  const badgeCls = classNames(classPrefix, {
+  const badgeClass = classNames(classPrefix, {
     [`${classPrefix}-fixed`]: !!children,
-    [`${classPrefix}-dot`]: !content,
+    [`${classPrefix}-dot`]: isDot,
+    [`${classPrefix}-bordered`]: props.bordered,
   })
+
+  const element =
+    content || content === 0
+      ? withNativeProps(
+          props,
+          <div
+            className={badgeClass}
+            style={
+              {
+                '--color': color,
+              } as BadgeProps['style']
+            }
+          >
+            {!isDot && (
+              <div className={`${classPrefix}-content`}>{content}</div>
+            )}
+          </div>
+        )
+      : null
 
   return children ? (
     <div
-      className={classNames(`${classPrefix}-wrap`, props.className)}
-      style={props.style}
+      className={classNames(`${classPrefix}-wrapper`, props.wrapperClassName)}
+      style={props.wrapperStyle}
     >
       {children}
-      <div className={badgeCls} style={badgeStyle}>
-        {content}
-      </div>
+      {element}
     </div>
   ) : (
-    <div
-      className={classNames(badgeCls, props.className)}
-      style={{
-        ...badgeStyle,
-        ...props.style,
-      }}
-    >
-      {content}
-    </div>
+    element
   )
-})
+}

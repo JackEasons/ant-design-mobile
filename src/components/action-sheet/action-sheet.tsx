@@ -1,42 +1,44 @@
-import React, {
-  forwardRef,
-  useState,
-  useImperativeHandle,
-  createRef,
-  useEffect,
-} from 'react'
-import { ElementProps } from '../../utils/element-props'
-import { withDefaultProps } from '../../utils/with-default-props'
+import React from 'react'
+import type { FC, ReactNode, CSSProperties } from 'react'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
+import { mergeProps } from '../../utils/with-default-props'
 import classNames from 'classnames'
-import Popup from '../popup'
-import Button from '../button'
-import { GetContainer } from '../../utils/render-to-container'
-import { renderToBody } from '../../utils/render-to-body'
+import Popup, { PopupProps } from '../popup'
+import SafeArea from '../safe-area'
+import { renderImperatively } from '../../utils/render-imperatively'
 
-const classPrefix = `am-action-sheet`
+const classPrefix = `adm-action-sheet`
 
 export type Action = {
   key: string | number
-  text: string
+  text: ReactNode
   disabled?: boolean
-  description?: string
+  description?: ReactNode
   danger?: boolean
+  bold?: boolean
   onClick?: () => void
 }
 
 export type ActionSheetProps = {
-  visible: boolean
+  visible?: boolean
   actions: Action[]
-  extra?: React.ReactNode
-  cancelText?: string
+  extra?: ReactNode
+  cancelText?: ReactNode
   onAction?: (action: Action, index: number) => void
   onClose?: () => void
-  afterClose?: () => void
   onMaskClick?: () => void
   closeOnAction?: boolean
   closeOnMaskClick?: boolean
-  getContainer?: GetContainer
-} & ElementProps
+  safeArea?: boolean
+  popupClassName?: string
+  /** @deprecated use `styles` instead */
+  popupStyle?: CSSProperties
+  styles?: Partial<Record<'body' | 'mask', CSSProperties>>
+} & Pick<
+  PopupProps,
+  'afterClose' | 'getContainer' | 'destroyOnClose' | 'forceRender'
+> &
+  NativeProps
 
 const defaultProps = {
   visible: false,
@@ -44,24 +46,36 @@ const defaultProps = {
   cancelText: '',
   closeOnAction: false,
   closeOnMaskClick: true,
+  safeArea: true,
+  destroyOnClose: false,
+  forceRender: false,
 }
 
-export const ActionSheet = withDefaultProps(defaultProps)<ActionSheetProps>(
-  props => {
-    return (
-      <Popup
-        visible={props.visible}
-        onMaskClick={() => {
-          props.onMaskClick?.()
-          if (props.closeOnMaskClick) {
-            props.onClose?.()
-          }
-        }}
-        afterClose={props.afterClose}
-        className={`${classPrefix}-popup`}
-        getContainer={props.getContainer}
-      >
-        <div className={classNames(classPrefix, props.className)}>
+export const ActionSheet: FC<ActionSheetProps> = p => {
+  const props = mergeProps(defaultProps, p)
+  const { styles } = props
+
+  return (
+    <Popup
+      visible={props.visible}
+      onMaskClick={() => {
+        props.onMaskClick?.()
+        if (props.closeOnMaskClick) {
+          props.onClose?.()
+        }
+      }}
+      afterClose={props.afterClose}
+      className={classNames(`${classPrefix}-popup`, props.popupClassName)}
+      style={props.popupStyle}
+      getContainer={props.getContainer}
+      destroyOnClose={props.destroyOnClose}
+      forceRender={props.forceRender}
+      bodyStyle={styles?.body}
+      maskStyle={styles?.mask}
+    >
+      {withNativeProps(
+        props,
+        <div className={classPrefix}>
           {props.extra && (
             <div className={`${classPrefix}-extra`}>{props.extra}</div>
           )}
@@ -71,10 +85,16 @@ export const ActionSheet = withDefaultProps(defaultProps)<ActionSheetProps>(
                 key={action.key}
                 className={`${classPrefix}-button-item-wrapper`}
               >
-                <Button
-                  block
-                  fill='none'
-                  disabled={action.disabled}
+                <a
+                  className={classNames(
+                    'adm-plain-anchor',
+                    `${classPrefix}-button-item`,
+                    {
+                      [`${classPrefix}-button-item-danger`]: action.danger,
+                      [`${classPrefix}-button-item-disabled`]: action.disabled,
+                      [`${classPrefix}-button-item-bold`]: action.bold,
+                    }
+                  )}
                   onClick={() => {
                     action.onClick?.()
                     props.onAction?.(action, index)
@@ -82,9 +102,8 @@ export const ActionSheet = withDefaultProps(defaultProps)<ActionSheetProps>(
                       props.onClose?.()
                     }
                   }}
-                  className={classNames(`${classPrefix}-button-item`, {
-                    [`${classPrefix}-button-item-danger`]: action.danger,
-                  })}
+                  role='option'
+                  aria-disabled={action.disabled}
                 >
                   <div className={`${classPrefix}-button-item-name`}>
                     {action.text}
@@ -94,69 +113,48 @@ export const ActionSheet = withDefaultProps(defaultProps)<ActionSheetProps>(
                       {action.description}
                     </div>
                   )}
-                </Button>
+                </a>
               </div>
             ))}
           </div>
 
           {props.cancelText && (
-            <div className={`${classPrefix}-cancel`}>
+            <div
+              className={`${classPrefix}-cancel`}
+              role='option'
+              aria-label={props.cancelText}
+            >
               <div className={`${classPrefix}-button-item-wrapper`}>
-                <Button
-                  block
-                  fill='none'
-                  className={`${classPrefix}-button-item`}
-                  onClick={() => {
-                    props.onClose?.()
-                  }}
+                <a
+                  className={classNames(
+                    'adm-plain-anchor',
+                    `${classPrefix}-button-item`
+                  )}
+                  onClick={props.onClose}
                 >
                   <div className={`${classPrefix}-button-item-name`}>
                     {props.cancelText}
                   </div>
-                </Button>
+                </a>
               </div>
             </div>
           )}
-        </div>
-      </Popup>
-    )
-  }
-)
 
-export function showActionSheet(props: Omit<ActionSheetProps, 'visible'>) {
-  type Ref = {
-    close: () => void
-  }
-  const Wrapper = forwardRef<Ref>((_, ref) => {
-    const [visible, setVisible] = useState(false)
-    useEffect(() => {
-      setVisible(true)
-    }, [])
-    useImperativeHandle(ref, () => ({
-      close: () => {
-        setVisible(false)
-      },
-    }))
-    return (
-      <ActionSheet
-        {...props}
-        visible={visible}
-        onClose={() => {
-          props.onClose?.()
-          setVisible(false)
-        }}
-        afterClose={() => {
-          props.afterClose?.()
-          unmount()
-        }}
-      />
-    )
-  })
-  const ref = createRef<Ref>()
-  const unmount = renderToBody(<Wrapper ref={ref} />)
-  return {
-    close: () => {
-      ref.current?.close()
-    },
-  }
+          {props.safeArea && <SafeArea position='bottom' />}
+        </div>
+      )}
+    </Popup>
+  )
+}
+
+export type ActionSheetShowHandler = {
+  close: () => void
+}
+
+export function showActionSheet(
+  props: Omit<ActionSheetProps, 'visible' | 'destroyOnClose' | 'forceRender'>
+) {
+  return renderImperatively(
+    <ActionSheet {...props} />
+  ) as ActionSheetShowHandler
 }

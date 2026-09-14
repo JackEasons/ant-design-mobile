@@ -1,18 +1,18 @@
+import { RightOutline } from 'antd-mobile-icons'
 import * as React from 'react'
 import { fireEvent, render, testA11y, waitFor } from 'testing'
-import { AntDesignOutlined, RightOutlined } from '@ant-design/icons'
 import Card from '../'
 
-const classPrefix = `am-card`
+const classPrefix = `adm-card`
 
 it('passes a11y test', async () => {
   await testA11y(<Card>test</Card>)
 })
 
 test('renders with title', () => {
-  const { getByText } = render(<Card title='title'>Card</Card>)
+  const { getByText } = render(<Card title='title'>body</Card>)
   expect(getByText('title')).toHaveClass(`${classPrefix}-header-title`)
-  expect(getByText('Card')).toHaveClass(`${classPrefix}-body`)
+  expect(getByText('body')).toHaveClass(`${classPrefix}-body`)
 })
 
 test('renders with event', async () => {
@@ -21,25 +21,29 @@ test('renders with event', async () => {
 
   const { getByText } = render(
     <Card
-      title={
-        <div style={{ fontWeight: 'normal' }}>
-          <AntDesignOutlined style={{ marginRight: '4px', color: '#1677ff' }} />
-          卡片标题
-        </div>
-      }
-      extra={<RightOutlined />}
+      icon='icon'
+      title='title'
+      extra={<RightOutline />}
       onBodyClick={onBodyClick}
       onHeaderClick={onHeaderClick}
     >
-      Card
+      body
     </Card>
   )
-  fireEvent.click(getByText('卡片标题'))
+  fireEvent.click(getByText('title'))
+  fireEvent.click(getByText('icon'))
   await waitFor(() => {
-    expect(onHeaderClick).toBeCalledTimes(1)
+    expect(onHeaderClick).toBeCalledTimes(2)
   })
-  fireEvent.click(getByText('Card'))
+  fireEvent.click(getByText('body'))
   await waitFor(() => {
     expect(onBodyClick).toBeCalledTimes(1)
   })
+})
+
+test('renders without children', async () => {
+  const { getByTestId } = render(
+    <Card title='title' data-testid='test-card-id' />
+  )
+  expect(getByTestId('test-card-id')).not.toHaveClass(`${classPrefix}-body`)
 })

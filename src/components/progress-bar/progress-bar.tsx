@@ -1,48 +1,56 @@
-import classNames from 'classnames'
 import React from 'react'
-import { convertPx } from '../../utils/convert-px'
-import { ElementProps } from '../../utils/element-props'
-import { withDefaultProps } from '../../utils/with-default-props'
+import type { FC, ReactNode } from 'react'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
+import { mergeProps } from '../../utils/with-default-props'
+import classNames from 'classnames'
+import { isNodeWithContent } from '../../utils/is-node-with-content'
 
-const classPrefix = `am-progress-bar`
+const classPrefix = `adm-progress-bar`
 
 export type ProgressBarProps = {
   percent?: number
-  strokeWidth?: number
-  strokeColor?: string
-} & ElementProps
+  rounded?: boolean
+  text?: boolean | ReactNode | ((percent: number) => ReactNode)
+} & NativeProps<
+  '--track-width' | '--track-color' | '--fill-color' | '--text-width'
+>
 
-export const ProgressBar = withDefaultProps({
+const defaultProps = {
   percent: 0,
-  strokeColor: '#1677FF',
-})<ProgressBarProps>(props => {
-  let { strokeWidth } = props
-  if (strokeWidth === undefined) {
-    strokeWidth = convertPx(3)
-  }
+  rounded: true,
+  text: false,
+}
 
-  const trailStyle = {
-    height: `${strokeWidth}px`,
-    borderRadius: `${strokeWidth / 2}px`,
-    background: '#e5e5e5',
-  }
-
-  const pathStyle = {
-    height: `${strokeWidth}px`,
-    borderRadius: `${strokeWidth / 2}px`,
+export const ProgressBar: FC<ProgressBarProps> = p => {
+  const props = mergeProps(defaultProps, p)
+  const fillStyle = {
     width: `${props.percent}%`,
-    background: props.strokeColor,
-    transition: 'width 0.3s',
   }
 
-  return (
+  const textElement = (function () {
+    if (props.text === true) {
+      return `${props.percent}%`
+    }
+    if (typeof props.text === 'function') {
+      return (props.text as (percent: number) => ReactNode)(props.percent)
+    }
+    return props.text
+  })()
+
+  return withNativeProps(
+    props,
     <div
-      className={classNames(classPrefix, props.className)}
-      style={props.style}
+      className={classNames(
+        classPrefix,
+        props.rounded && `${classPrefix}-rounded`
+      )}
     >
-      <div className={`${classPrefix}-trail`} style={trailStyle}>
-        <div className={classNames(`${classPrefix}-path`)} style={pathStyle} />
+      <div className={`${classPrefix}-trail`}>
+        <div className={`${classPrefix}-fill`} style={fillStyle} />
       </div>
+      {isNodeWithContent(textElement) && (
+        <div className={`${classPrefix}-text`}>{textElement}</div>
+      )}
     </div>
   )
-})
+}

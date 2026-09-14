@@ -1,89 +1,82 @@
-import React, { useState } from 'react'
-import { Selector } from 'antd-mobile'
+import React from 'react'
+import { Selector, Space } from 'antd-mobile'
 import { DemoBlock } from 'demos'
-
-const ItemList = [
-  {
-    label: '选项一',
-    value: '1',
-  },
-  {
-    label: '选项二',
-    value: '2',
-    disabled: true,
-  },
-  {
-    label: '选项三',
-    value: '3',
-  },
-  {
-    label: '选项四',
-    value: '4',
-  },
-]
-
-const RadioMode = () => {
-  const [value, setValue] = useState('1')
-  return (
-    <Selector
-      options={ItemList}
-      value={[value]}
-      onChange={v => {
-        if (v.length) {
-          setValue(v[0])
-        }
-      }}
-    />
-  )
-}
+import { options, fieldNamesOptions } from './options'
 
 export default () => {
   return (
-    <div>
+    <>
       <DemoBlock title='单选'>
         <Selector
-          options={ItemList}
+          options={options}
           defaultValue={['1']}
-          onChange={arr => console.log(arr)}
+          onChange={(arr, extend) => console.log(arr, extend.items)}
         />
       </DemoBlock>
+
       <DemoBlock title='多选'>
         <Selector
-          options={ItemList}
+          options={options}
           defaultValue={['2', '3']}
-          multiple={true}
-          onChange={arr => console.log(arr)}
+          multiple
+          onChange={(arr, extend) => console.log(arr, extend.items)}
         />
       </DemoBlock>
-      <DemoBlock title='全局禁止'>
-        <Selector
-          options={ItemList}
-          defaultValue={['1']}
-          disabled={true}
-          onChange={arr => console.log(arr)}
-        />
-      </DemoBlock>
-      <DemoBlock title='固定两列'>
+
+      <DemoBlock title='两列布局'>
         <Selector
           columns={2}
-          options={ItemList}
+          options={options}
           defaultValue={['2', '3']}
-          multiple={true}
-          onChange={arr => console.log(arr)}
+          multiple
         />
       </DemoBlock>
-      <DemoBlock title='固定三列'>
+
+      <DemoBlock title='三列布局'>
         <Selector
           columns={3}
-          options={ItemList}
+          options={options}
           defaultValue={['2', '3']}
-          multiple={true}
-          onChange={arr => console.log(arr)}
+          multiple
         />
       </DemoBlock>
-      <DemoBlock title='避免取消选择'>
-        <RadioMode />
+
+      <DemoBlock title='禁用状态'>
+        <Space block direction='vertical'>
+          <Selector options={options} defaultValue={['1']} disabled />
+          <Selector
+            options={[
+              {
+                label: '选项一',
+                value: '1',
+              },
+              {
+                label: '选项二',
+                value: '2',
+                disabled: true,
+              },
+              {
+                label: '选项三',
+                value: '3',
+              },
+            ]}
+            defaultValue={['3']}
+          />
+        </Space>
       </DemoBlock>
-    </div>
+      <DemoBlock title='自定义FieldName'>
+        <Selector
+          options={fieldNamesOptions}
+          fieldNames={{
+            label: 'labelT',
+            value: 'valueT',
+            disabled: 'disabledT',
+          }}
+          defaultValue={['1']}
+          multiple
+          onChange={(arr, extend) => console.log(arr, extend.items)}
+        />
+      </DemoBlock>
+    </>
   )
 }

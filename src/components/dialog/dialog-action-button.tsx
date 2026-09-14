@@ -1,15 +1,17 @@
-import React, { FC, useState } from 'react'
+import React from 'react'
+import type { FC, ReactNode } from 'react'
 import classNames from 'classnames'
 import Button from '../button'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
 
 export type Action = {
   key: string | number
-  text: string
+  text: ReactNode
   disabled?: boolean
   danger?: boolean
   bold?: boolean
   onClick?: () => void | Promise<void>
-}
+} & NativeProps
 
 export const DialogActionButton: FC<{
   action: Action
@@ -17,29 +19,19 @@ export const DialogActionButton: FC<{
 }> = props => {
   const { action } = props
 
-  const [loading, setLoading] = useState(false)
-
-  return (
+  return withNativeProps(
+    props.action,
     <Button
       key={action.key}
-      onClick={async () => {
-        setLoading(true)
-        try {
-          await action.onClick?.()
-          await props.onAction?.()
-        } catch (e) {
-          setLoading(false)
-          throw e
-        }
-        setLoading(false)
-      }}
-      className={classNames('am-dialog-button', {
-        'am-dialog-button-bold': action.bold,
+      onClick={props.onAction}
+      className={classNames('adm-dialog-button', {
+        'adm-dialog-button-bold': action.bold,
       })}
       fill='none'
+      shape='rectangular'
       block
       color={action.danger ? 'danger' : 'primary'}
-      loading={loading}
+      loading='auto'
       disabled={action.disabled}
     >
       {action.text}

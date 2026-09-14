@@ -1,19 +1,29 @@
-@class-prefix-input: ~'am-input';
+@class-prefix-input: ~'adm-input';
 
-.@{class-prefix-input}-wrapper {
-  --font-size: 17px;
-  --color: var(--am-color-text);
-  --placeholder-color: var(--am-color-light);
-  --disabled-color: var(--am-color-weak);
+.@{class-prefix-input} {
+  --font-size: var(--adm-font-size-9);
+  --color: var(--adm-color-text);
+  --placeholder-color: var(--adm-color-light);
+  --text-align: left;
+
+  --background-color: transparent;
+
   display: flex;
   justify-content: flex-start;
   align-items: center;
   width: 100%;
   max-width: 100%;
   max-height: 100%;
+  min-height: 24px;
+  background-color: var(--background-color);
+
+  &-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 }
 
-.@{class-prefix-input} {
+.@{class-prefix-input}-element {
   flex: auto;
   display: inline-block;
   box-sizing: border-box;
@@ -30,6 +40,7 @@
   outline: none;
   appearance: none;
   min-height: 1.5em;
+  text-align: var(--text-align);
 
   &::placeholder {
     color: var(--placeholder-color);
@@ -38,13 +49,6 @@
 
   &:-webkit-autofill {
     background-color: transparent;
-  }
-
-  &:disabled {
-    color: var(--disabled-color);
-    cursor: not-allowed;
-    opacity: 1;
-    -webkit-text-fill-color: var(--disabled-color);
   }
 
   &:read-only {
@@ -58,11 +62,19 @@
   &::-ms-clear {
     display: none;
   }
+
+  &::-ms-reveal {
+    display: none;
+  }
+
   &::-webkit-search-cancel-button {
     display: none;
   }
   &::-webkit-search-decoration {
     display: none;
+  }
+  &:disabled {
+    opacity: 1;
   }
 
   // for ios
@@ -85,11 +97,14 @@
 .@{class-prefix-input}-clear {
   flex: none;
   margin-left: 8px;
-  color: var(--placeholder-color);
-  padding: 3px;
+  color: var(--adm-color-light);
+  &:active {
+    color: var(--adm-color-weak);
+  }
+  padding: 4px;
   cursor: pointer;
-  .anticon {
+  .antd-mobile-icon {
     display: block;
-    font-size: 14px;
+    font-size: var(--adm-font-size-7);
   }
 }

@@ -1,135 +1,193 @@
-import classNames from 'classnames'
-import React, { useMemo } from 'react'
-import { ElementProps } from '../../utils/element-props'
-import { getTreeDeep } from '../../utils/tree'
-import { withDefaultProps } from '../../utils/with-default-props'
-import { useNewControllableValue } from '../../utils/use-controllable-value'
+import React, {
+  ReactNode,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from 'react'
+import type { FieldNamesType } from '../../hooks'
+import { useFieldNames } from '../../hooks'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
+import { usePropsValue } from '../../utils/use-props-value'
+import { mergeProps } from '../../utils/with-default-props'
+import CascaderView, {
+  CascaderOption,
+  CascaderValue,
+  CascaderValueExtend,
+  CascaderViewOptionRender,
+} from '../cascader-view'
+import { useCascaderValueExtend } from '../cascader-view/use-cascader-value-extend'
+import { useConfig } from '../config-provider'
+import Popup, { PopupProps } from '../popup'
 
-const classPrefix = `am-cascader`
+const classPrefix = `adm-cascader`
 
-export interface CascaderOption {
-  [key: string]: any
+export type CascaderActions = {
+  open: () => void
+  close: () => void
+  toggle: () => void
 }
+export type CascaderRef = CascaderActions
 
 export type CascaderProps = {
   options: CascaderOption[]
-  defaultValue?: string[]
-  value?: string[]
-  onChange?: (value: string[], nodes: CascaderOption[]) => void
-  fieldNames?: { label: string; value: string; children: string }
-} & ElementProps
+  value?: CascaderValue[]
+  defaultValue?: CascaderValue[]
+  placeholder?: string
+  onSelect?: (value: CascaderValue[], extend: CascaderValueExtend) => void
+  onConfirm?: (value: CascaderValue[], extend: CascaderValueExtend) => void
+  onCancel?: () => void
+  onClose?: () => void
+  visible?: boolean
+  title?: ReactNode
+  confirmText?: ReactNode
+  cancelText?: ReactNode
+  loading?: boolean
+  children?: (
+    items: (CascaderOption | null)[],
+    actions: CascaderActions
+  ) => ReactNode
+  onTabsChange?: (index: number) => void
+  activeIcon?: ReactNode
+  fieldNames?: FieldNamesType
+  optionRender?: CascaderViewOptionRender
+} & Pick<
+  PopupProps,
+  | 'getContainer'
+  | 'afterShow'
+  | 'afterClose'
+  | 'onClick'
+  | 'stopPropagation'
+  | 'destroyOnClose'
+  | 'forceRender'
+> &
+  NativeProps
 
-export const Cascader = withDefaultProps({
-  options: [],
-  fieldNames: {},
+const defaultProps = {
   defaultValue: [],
-})<CascaderProps>(props => {
-  const labelName = props.fieldNames.label || 'label'
-  const valueName = props.fieldNames.value || 'value'
-  const childrenName = props.fieldNames.children || 'children'
+  destroyOnClose: true,
+  forceRender: false,
+}
 
-  const [value, setValue] = useNewControllableValue({
-    value: props.value,
-    defaultValue: props.defaultValue,
+export const Cascader = forwardRef<CascaderRef, CascaderProps>((p, ref) => {
+  const { locale } = useConfig()
+  const props = mergeProps(
+    defaultProps,
+    {
+      confirmText: locale.common.confirm,
+      cancelText: locale.common.cancel,
+      placeholder: locale.Cascader.placeholder,
+    },
+    p
+  )
+
+  const [visible, setVisible] = usePropsValue({
+    value: props.visible,
+    defaultValue: false,
+    onChange: v => {
+      if (v === false) {
+        props.onClose?.()
+      }
+    },
   })
 
-  const [deep, optionsMap, optionsParentMap] = useMemo(() => {
-    const deep = getTreeDeep(props.options, childrenName)
-
-    const optionsMap = new Map<string, CascaderOption>()
-    const optionsParentMap = new Map<string, CascaderOption | undefined>()
-
-    function traverse(
-      current: CascaderOption | undefined,
-      children: CascaderOption[]
-    ) {
-      children.forEach(item => {
-        optionsParentMap.set(item[valueName], current)
-        optionsMap.set(item[valueName], item)
-        if (item[childrenName]) {
-          traverse(item, item[childrenName])
-        }
-      })
-    }
-    traverse(undefined, props.options)
-
-    return [deep, optionsMap, optionsParentMap]
-  }, [props.options])
-
-  const onItemSelect = (node: CascaderOption) => {
-    // 找到父级节点
-    const parentNodes: CascaderOption[] = []
-    let current: CascaderOption | undefined = node
-    while (current) {
-      parentNodes.unshift(current)
-      const next = optionsParentMap.get(current[valueName])
-      current = next
-    }
-
-    const values = parentNodes.map(i => i[valueName])
-    setValue(values)
-    props.onChange?.(values, parentNodes)
+  const actions: CascaderActions = {
+    toggle: () => {
+      setVisible(v => !v)
+    },
+    open: () => {
+      setVisible(true)
+    },
+    close: () => {
+      setVisible(false)
+    },
   }
 
-  const renderItems = (columnOptions: CascaderOption[] = [], index: number) => {
-    return columnOptions.map(item => {
-      const isActive = item[valueName] === value[index]
-      return (
-        <div
-          key={item[valueName]}
-          className={classNames(`${classPrefix}-item`, {
-            [`${classPrefix}-item-active`]: isActive,
-          })}
+  useImperativeHandle(ref, () => actions)
+
+  const [value, setValue] = usePropsValue({
+    ...props,
+    onChange: val => {
+      props.onConfirm?.(val, generateValueExtend(val))
+    },
+  })
+
+  const [, valueName, childrenName] = useFieldNames(props.fieldNames)
+  const generateValueExtend = useCascaderValueExtend(props.options, {
+    valueName,
+    childrenName,
+  })
+
+  const [innerValue, setInnerValue] = useState<CascaderValue[]>(value)
+
+  useEffect(() => {
+    setInnerValue(value)
+  }, [visible, value])
+
+  const cascaderElement = withNativeProps(
+    props,
+    <div className={classPrefix}>
+      <div className={`${classPrefix}-header`}>
+        <a
+          className={`${classPrefix}-header-button`}
           onClick={() => {
-            if (!isActive) {
-              onItemSelect(item)
-            }
+            props.onCancel?.()
+            setVisible(false)
           }}
         >
-          {item[labelName]}
-        </div>
-      )
-    })
-  }
-
-  const renderColumns = () => {
-    const columns = []
-    for (let i = 0; i < deep; i++) {
-      let width = `${100 / deep}%`
-
-      // 两列的第一列宽度为 33.33，两列的第二列为 66.67%
-      if (deep === 2 && i === 0) {
-        width = `33.33%`
-      }
-      if (deep === 2 && i === 1) {
-        width = `66.67%`
-      }
-
-      const column = (
-        <div
-          key={i}
-          className={classNames(`${classPrefix}-column`)}
-          style={{ width }}
+          {props.cancelText}
+        </a>
+        <div className={`${classPrefix}-header-title`}>{props.title}</div>
+        <a
+          className={`${classPrefix}-header-button`}
+          onClick={() => {
+            setValue(innerValue, true)
+            setVisible(false)
+          }}
         >
-          {renderItems(
-            i === 0
-              ? props.options
-              : optionsMap.get(value[i - 1])?.[childrenName],
-            i
-          )}
-        </div>
-      )
-      columns.push(column)
-    }
-    return columns
-  }
+          {props.confirmText}
+        </a>
+      </div>
+      <div className={`${classPrefix}-body`}>
+        <CascaderView
+          {...props}
+          value={innerValue}
+          onChange={(val, ext) => {
+            setInnerValue(val)
+            if (visible) {
+              props.onSelect?.(val, ext)
+            }
+          }}
+        />
+      </div>
+    </div>
+  )
+
+  const popupElement = (
+    <Popup
+      className={`${classPrefix}-popup`}
+      visible={visible}
+      position='bottom'
+      onMaskClick={() => {
+        props.onCancel?.()
+        setVisible(false)
+      }}
+      getContainer={props.getContainer}
+      destroyOnClose={props.destroyOnClose}
+      forceRender={props.forceRender}
+      afterShow={props.afterShow}
+      afterClose={props.afterClose}
+      onClick={props.onClick}
+      stopPropagation={props.stopPropagation}
+    >
+      {cascaderElement}
+    </Popup>
+  )
 
   return (
-    <div
-      className={classNames(classPrefix, props.className)}
-      style={props.style}
-    >
-      {renderColumns()}
-    </div>
+    <>
+      {popupElement}
+      {props.children?.(generateValueExtend(value).items, actions)}
+    </>
   )
 })

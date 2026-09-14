@@ -1,259 +1,170 @@
-import * as React from 'react'
-import { fireEvent, render, testA11y, waitFor } from 'testing'
-import Cascader from '../'
+import React, { useState } from 'react'
+import { fireEvent, render, screen, testA11y, waitFor } from 'testing'
+import Cascader, { CascaderValue } from '../'
+import { options } from '../demos/data'
 
-const classPrefix = `am-cascader`
-const options = [
-  {
-    label: '分类A',
-    value: 'A',
-    children: [
-      {
-        label: '分类A-1',
-        value: 'A1',
-      },
-      {
-        label: '分类A-2',
-        value: 'A2',
-      },
-    ],
-  },
-  {
-    label: '分类B',
-    value: 'B',
-    children: [
-      {
-        label: '分类B-1',
-        value: 'B1',
-      },
-      {
-        label: '分类B-2',
-        value: 'B2',
-      },
-    ],
-  },
-]
-
-const optionsList = [
-  {
-    title: '分类A',
-    data: 'A',
-    list: [
-      {
-        title: '分类A-1',
-        data: 'A1',
-      },
-      {
-        title: '分类A-2',
-        data: 'A2',
-      },
-    ],
-  },
-  {
-    title: '分类B',
-    data: 'B',
-    list: [
-      {
-        title: '分类B-1',
-        data: 'B1',
-      },
-      {
-        title: '分类B-2',
-        data: 'B2',
-      },
-    ],
-  },
-]
-
-const optionsMultiple = [
-  {
-    label: '分类A',
-    value: 'A',
-    children: [
-      {
-        label: '分类A-1',
-        value: 'A1',
-        children: [
-          {
-            label: '分类A-1-1',
-            value: 'A11',
-          },
-          {
-            label: '分类A-1-2',
-            value: 'A12',
-          },
-        ],
-      },
-      {
-        label: '分类A-2',
-        value: 'A2',
-        children: [
-          {
-            label: '分类A-2-1',
-            value: 'A21',
-          },
-          {
-            label: '分类A-2-2',
-            value: 'A22',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    label: '分类B',
-    value: 'B',
-    children: [
-      {
-        label: '分类B-1',
-        value: 'B1',
-        children: [
-          {
-            label: '分类B-1-1',
-            value: 'B11',
-          },
-          {
-            label: '分类B-1-2',
-            value: 'B12',
-          },
-        ],
-      },
-      {
-        label: '分类B-2',
-        value: 'B2',
-        children: [
-          {
-            label: '分类B-2-1',
-            value: 'B21',
-          },
-          {
-            label: '分类B-2-2',
-            value: 'B22',
-          },
-        ],
-      },
-    ],
-  },
-]
-
-it('passes a11y test', async () => {
-  await testA11y(
-    <Cascader
-      defaultValue={['A', 'A1']}
-      options={options}
-      onChange={(value, nodes) => {
-        console.log(value, nodes)
-      }}
-    />
-  )
-})
-
-test('renders basic', () => {
-  function Basic() {
-    const [data, setData] = React.useState<string[]>()
-    return (
-      <>
-        <Cascader
-          defaultValue={['A', 'A1']}
-          options={options}
-          onChange={value => {
-            setData(value)
-          }}
-        />
-        <div data-testid='res'>{JSON.stringify(data)}</div>
-      </>
-    )
-  }
-  const { getByText, getByTestId } = render(<Basic />)
-  // 判断 defaultValue 是否生效
-  expect(getByText('分类A')).toHaveClass(`${classPrefix}-item-active`)
-  expect(getByText('分类A-1')).toHaveClass(`${classPrefix}-item-active`)
-  // 点选新的值
-  fireEvent.click(getByText('分类B'))
-  fireEvent.click(getByText('分类B-2'))
-  // 判断 onChange 回传的数据是否正确
-  expect(getByTestId('res')).toHaveTextContent('["B","B2"]')
-})
-
-test('renders with fieldNames', () => {
-  const { getByText } = render(
-    <Cascader
-      defaultValue={['A', 'A1']}
-      options={optionsList}
-      fieldNames={{
-        label: 'title',
-        value: 'data',
-        children: 'list',
-      }}
-    />
-  )
-  // 判断修改 fieldNames 之后，能从新 options 中取到值即可
-  expect(getByText('分类A')).toHaveClass(`${classPrefix}-item-active`)
-  expect(getByText('分类A-1')).toHaveClass(`${classPrefix}-item-active`)
-})
-
-test('renders with multiple', async () => {
-  const fn = jest.fn()
-  function MultipleBasic() {
-    const [data, setData] = React.useState<string[]>()
-    return (
-      <>
-        <Cascader.Multiple
-          defaultValue={['A1']}
-          defaultExpandKeys={['A', 'A1']}
-          options={optionsMultiple}
-          onExpand={() => {
-            fn()
-          }}
-          onChange={value => {
-            setData(value)
-          }}
-          selectAllText={['', '全选1', '全选2']}
-        />
-        <div data-testid='res'>{JSON.stringify(data)}</div>
-      </>
-    )
-  }
-  const { getByText, getByTestId } = render(<MultipleBasic />)
-  // 判断 defaultExpandKeys 是否生效
-  expect(getByText('分类A')).toHaveClass('am-cascader-multiple-item-expand')
-  // multiple 多了一个小圆点
-  expect(getByText('分类A').lastElementChild).toHaveClass(
-    'am-cascader-multiple-dot'
-  )
-  expect(getByText('分类A-1')).toHaveClass('am-cascader-multiple-item-expand')
-  expect(getByText('分类A-1').lastElementChild).toHaveClass(
-    'am-cascader-multiple-dot'
-  )
-  // 第三列全勾选
-  expect(getByText('全选2').firstChild).toHaveClass('am-checkbox-checked')
-  expect(getByText('分类A-1-1').firstChild).toHaveClass('am-checkbox-checked')
-  expect(getByText('分类A-1-2').firstChild).toHaveClass('am-checkbox-checked')
-
-  // 点选第二列的全选
-  fireEvent.click(getByText('全选1'))
-  // 判断 onChange 回传的数据是否正确
-  expect(getByTestId('res')).toHaveTextContent('["A"]')
-  // 点选第二列的A-2，再选第三列的全选，取消 A-2 的选中
-  fireEvent.click(getByText('分类A-2'))
-  fireEvent.click(getByText('全选2'))
-  expect(getByText('分类A-2-2').firstChild).not.toHaveClass(
-    'am-checkbox-checked'
-  )
-  // 判断 onChange 回传的数据是否正确
-  expect(getByTestId('res')).toHaveTextContent('["A1"]')
-  await waitFor(() => {
-    // onExpand 事件响应了一次
-    expect(fn).toBeCalledTimes(1)
+describe('Cascader', () => {
+  test('a11y', async () => {
+    await testA11y(<Cascader options={options} visible={true} />)
   })
-  // 选中第一列的 分类B
-  fireEvent.click(getByText('分类B'))
-  // 点选第二列的全选
-  fireEvent.click(getByText('全选1'))
-  // 判断 onChange 回传的数据是否正确
-  expect(getByTestId('res')).toHaveTextContent('["A1","B"]')
-  await waitFor(() => {
-    // onExpand 事件响应了2次
-    expect(fn).toBeCalledTimes(2)
+
+  test('basic usage', async () => {
+    const onConfirm = jest.fn()
+    const onTabsChange = jest.fn()
+    const App = () => {
+      const [visible, setVisible] = useState(false)
+
+      return (
+        <>
+          <button
+            onClick={() => {
+              setVisible(true)
+            }}
+          >
+            Choose
+          </button>
+
+          <Cascader
+            onTabsChange={onTabsChange}
+            options={options}
+            visible={visible}
+            onClose={() => {
+              setVisible(false)
+            }}
+            onConfirm={onConfirm}
+          />
+        </>
+      )
+    }
+
+    const { getByText } = render(<App />)
+
+    fireEvent.click(getByText('Choose'))
+    await waitFor(() => {
+      fireEvent.click(getByText('浙江'))
+      fireEvent.click(getByText('杭州'))
+    })
+    fireEvent.click(getByText('请选择'))
+    expect(onTabsChange).toBeCalledTimes(2)
+
+    fireEvent.click(getByText('确定'))
+
+    expect(onConfirm.mock.calls[0][0]).toEqual(['浙江', '杭州'])
+  })
+
+  test('should sync value when visible and external value changes', async () => {
+    const App = () => {
+      const [visible, setVisible] = useState(false)
+      const [value, setValue] = useState<CascaderValue[]>([])
+
+      return (
+        <>
+          <button onClick={() => setVisible(true)}>Open</button>
+          <button onClick={() => setValue(['安徽', '合肥'])}>Set Value</button>
+          <Cascader
+            options={options}
+            visible={visible}
+            value={value}
+            onConfirm={val => {
+              setValue(val)
+              setVisible(false)
+            }}
+            onClose={() => setVisible(false)}
+            onCancel={() => setVisible(false)}
+          />
+        </>
+      )
+    }
+
+    render(<App />)
+
+    fireEvent.click(screen.getByText('Open'))
+    await waitFor(() => {
+      expect(screen.getByText('浙江')).toBeInTheDocument()
+    })
+
+    // While the popup is open, change the external value
+    fireEvent.click(screen.getByText('Set Value'))
+
+    // The cascader should reflect the new value (合肥 should appear in both tab and list)
+    await waitFor(() => {
+      const matches = screen.getAllByText('合肥')
+      expect(matches.length).toBeGreaterThanOrEqual(1)
+    })
+  })
+
+  test('should preserve draft selection when parent re-renders with same value', async () => {
+    const App = () => {
+      const [visible, setVisible] = useState(false)
+      const [value, setValue] = useState<CascaderValue[]>([])
+      const [, setTick] = useState(0)
+
+      return (
+        <>
+          <button onClick={() => setVisible(true)}>Open</button>
+          {/* Trigger a parent re-render without changing value content */}
+          <button onClick={() => setTick(t => t + 1)}>Rerender</button>
+          <Cascader
+            options={options}
+            visible={visible}
+            value={value}
+            onConfirm={val => {
+              setValue(val)
+              setVisible(false)
+            }}
+            onClose={() => setVisible(false)}
+            onCancel={() => setVisible(false)}
+          />
+        </>
+      )
+    }
+
+    render(<App />)
+
+    fireEvent.click(screen.getByText('Open'))
+    await waitFor(() => {
+      expect(screen.getByText('浙江')).toBeInTheDocument()
+    })
+
+    // User selects 浙江 in the cascader (draft, not confirmed)
+    fireEvent.click(screen.getByText('浙江'))
+
+    // Wait for the selection to take effect
+    await waitFor(() => {
+      expect(screen.getAllByText('浙江').length).toBeGreaterThanOrEqual(2)
+    })
+
+    // Parent re-renders with the same value content ([])
+    fireEvent.click(screen.getByText('Rerender'))
+
+    // The draft selection should be preserved — 浙江 should still appear as a selected tab
+    expect(screen.getAllByText('浙江').length).toBeGreaterThanOrEqual(2)
+  })
+
+  test('use in an imperative way', async () => {
+    const fn = jest.fn()
+    const onClick = async () => {
+      const value = await Cascader.prompt({
+        options,
+        title: 'Select the address',
+      })
+      fn(value)
+    }
+
+    const { getByText } = render(<button onClick={onClick}>Popup</button>)
+
+    fireEvent.click(getByText('Popup'))
+
+    await waitFor(() => {
+      fireEvent.click(getByText('浙江'))
+      fireEvent.click(getByText('杭州'))
+      fireEvent.click(getByText('西湖区'))
+    })
+
+    fireEvent.click(getByText('确定'))
+
+    await waitFor(() => {
+      expect(fn.mock.calls[0][0]).toEqual(['浙江', '杭州', '西湖区'])
+    })
   })
 })

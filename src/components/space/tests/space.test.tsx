@@ -1,8 +1,8 @@
 import React from 'react'
-import { render, testA11y } from 'testing'
+import { fireEvent, render, testA11y } from 'testing'
 import Space from '../'
 
-const classPrefix = `am-space`
+const classPrefix = `adm-space`
 
 it('passes a11y test', async () => {
   await testA11y(<Space>test</Space>)
@@ -16,7 +16,7 @@ test('renders basic', () => {
       <div>block3</div>
     </Space>
   )
-  const amSpace = container.getElementsByClassName('am-space')[0]
+  const amSpace = container.getElementsByClassName('adm-space')[0]
   expect(amSpace).toHaveClass(`${classPrefix}-horizontal`)
   expect(amSpace.firstChild).toHaveStyle('margin-right: var(--horizontal-size)')
   expect(getByTestId('block').parentElement).toHaveClass(`${classPrefix}-item`)
@@ -30,7 +30,7 @@ test('renders with wrap', () => {
       <div>block3</div>
     </Space>
   )
-  const amSpace = container.getElementsByClassName('am-space')[0]
+  const amSpace = container.getElementsByClassName('adm-space')[0]
   expect(amSpace).toHaveClass(`${classPrefix}-wrap`)
 })
 
@@ -42,23 +42,21 @@ test('renders with direction', () => {
       <div>block3</div>
     </Space>
   )
-  const amSpace = container.getElementsByClassName('am-space')[0]
+  const amSpace = container.getElementsByClassName('adm-space')[0]
   expect(amSpace).toHaveClass(`${classPrefix}-vertical`)
 })
 
-test('renders with size', () => {
+test('renders with justify', () => {
+  const justify = 'center'
   const { container } = render(
-    <Space size='24px'>
+    <Space justify={justify}>
       <div>block1</div>
       <div>block2</div>
       <div>block3</div>
     </Space>
   )
-  const amSpace = container.getElementsByClassName('am-space')[0]
-  expect(amSpace).toHaveStyle({
-    '--vertical-size': '24px',
-    '--horizontal-size': '24px',
-  })
+  const amSpace = container.getElementsByClassName('adm-space')[0]
+  expect(amSpace).toHaveClass(`${classPrefix}-justify-${justify}`)
 })
 
 test('renders with align', () => {
@@ -70,7 +68,7 @@ test('renders with align', () => {
       <div>block3</div>
     </Space>
   )
-  const amSpace = container.getElementsByClassName('am-space')[0]
+  const amSpace = container.getElementsByClassName('adm-space')[0]
   expect(amSpace).toHaveClass(`${classPrefix}-align-${align}`)
 })
 
@@ -82,6 +80,13 @@ test('renders with block', () => {
       <div>block3</div>
     </Space>
   )
-  const amSpace = container.getElementsByClassName('am-space')[0]
+  const amSpace = container.getElementsByClassName('adm-space')[0]
   expect(amSpace).toHaveClass(`${classPrefix}-block`)
+})
+
+test('renders with onClick event', () => {
+  const onClick = jest.fn()
+  const { getByText } = render(<Space onClick={onClick}>Block</Space>)
+  fireEvent.click(getByText('Block'))
+  expect(onClick).toBeCalledTimes(1)
 })

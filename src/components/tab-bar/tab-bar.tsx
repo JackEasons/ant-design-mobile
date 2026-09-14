@@ -1,33 +1,48 @@
-import { FC, ReactNode, ReactElement, ComponentProps } from 'react'
-import React from 'react'
+import React, { isValidElement } from 'react'
+import type { FC, ReactNode, ReactElement } from 'react'
 import classNames from 'classnames'
-import { ElementProps } from '../../utils/element-props'
-import Badge from '../badge'
-import { useNewControllableValue } from '../../utils/use-controllable-value'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
+import { mergeProps } from '../../utils/with-default-props'
+import Badge, { BadgeProps } from '../badge'
+import SafeArea from '../safe-area'
+import { usePropsValue } from '../../utils/use-props-value'
+import { traverseReactNode } from '../../utils/traverse-react-node'
 
 export type TabBarItemProps = {
-  icon?: ReactNode
-  title?: string
-  badge?: ReactNode
-} & ElementProps
+  icon?: ReactNode | ((active: boolean) => ReactNode)
+  title?: ReactNode | ((active: boolean) => ReactNode)
+  badge?: BadgeProps['content']
+  onClick?: () => void
+} & NativeProps
 
+/* istanbul ignore next */
 export const TabBarItem: FC<TabBarItemProps> = () => {
   return null
 }
 
 export type TabBarProps = {
-  activeKey?: string
-  defaultActiveKey?: string
+  activeKey?: string | null
+  defaultActiveKey?: string | null
   onChange?: (key: string) => void
-} & ElementProps
+  safeArea?: boolean
+  children?: ReactNode
+} & NativeProps
 
-export const TabBar: FC<TabBarProps> = props => {
+const classPrefix = `adm-tab-bar`
+
+const defaultProps = {
+  safeArea: false,
+}
+
+export const TabBar: FC<TabBarProps> = p => {
+  const props = mergeProps(defaultProps, p)
+
   let firstActiveKey: string | null = null
 
-  const items: ReactElement<ComponentProps<typeof TabBarItem>>[] = []
+  const items: ReactElement<TabBarItemProps>[] = []
 
-  React.Children.forEach(props.children, (child, index) => {
-    if (!React.isValidElement(child)) return
+  traverseReactNode(props.children, (child, index) => {
+    if (!isValidElement<TabBarItemProps>(child)) return
     const key = child.key
     if (typeof key !== 'string') return
     if (index === 0) {
@@ -36,30 +51,49 @@ export const TabBar: FC<TabBarProps> = props => {
     items.push(child)
   })
 
-  const [activeKey, setActiveKey] = useNewControllableValue({
+  const [activeKey, setActiveKey] = usePropsValue({
     value: props.activeKey,
     defaultValue: props.defaultActiveKey ?? firstActiveKey,
-    onChange: props.onChange,
+    onChange: v => {
+      if (v === null) return
+      props.onChange?.(v)
+    },
   })
 
-  return (
-    <div
-      className={classNames('am-tab-bar', props.className)}
-      style={props.style}
-    >
-      {items.map(item => {
-        function renderContent() {
-          const iconElement = item.props.icon && (
-            <div className='am-tab-bar-item-icon'>{item.props.icon}</div>
-          )
-          const titleElement = item.props.title && (
-            <div className='am-tab-bar-item-title'>{item.props.title}</div>
-          )
-          if (item.props.badge !== undefined) {
+  return withNativeProps(
+    props,
+    <div className={classPrefix}>
+      <div className={`${classPrefix}-wrap`}>
+        {items.map(item => {
+          const active = item.key === activeKey
+
+          function renderContent() {
+            const iconElement = item.props.icon && (
+              <div className={`${classPrefix}-item-icon`}>
+                {typeof item.props.icon === 'function'
+                  ? item.props.icon(active)
+                  : item.props.icon}
+              </div>
+            )
+            const titleElement = item.props.title && (
+              <div
+                className={classNames(
+                  `${classPrefix}-item-title`,
+                  Boolean(iconElement) && `${classPrefix}-item-title-with-icon`
+                )}
+              >
+                {typeof item.props.title === 'function'
+                  ? item.props.title(active)
+                  : item.props.title}
+              </div>
+            )
             if (iconElement) {
               return (
                 <>
-                  <Badge content={item.props.badge} offset={[0, 6]}>
+                  <Badge
+                    content={item.props.badge}
+                    className={`${classPrefix}-icon-badge`}
+                  >
                     {iconElement}
                   </Badge>
                   {titleElement}
@@ -67,39 +101,40 @@ export const TabBar: FC<TabBarProps> = props => {
               )
             } else if (titleElement) {
               return (
-                <>
-                  <Badge content={item.props.badge} offset={[2, -2]}>
-                    {titleElement}
-                  </Badge>
-                </>
+                <Badge
+                  content={item.props.badge}
+                  className={`${classPrefix}-title-badge`}
+                >
+                  {titleElement}
+                </Badge>
               )
             }
-          } else {
-            return (
-              <>
-                {iconElement}
-                {titleElement}
-              </>
-            )
+            return null
           }
-          return null
-        }
-        return (
-          <div
-            key={item.key}
-            onClick={() => {
-              const { key } = item
-              if (key === undefined || key === null) return
-              setActiveKey(key.toString())
-            }}
-            className={classNames('am-tab-bar-item', item.props.className, {
-              'am-tab-bar-item-active': item.key === activeKey,
-            })}
-          >
-            {renderContent()}
-          </div>
-        )
-      })}
+
+          return withNativeProps(
+            item.props,
+            <div
+              key={item.key}
+              onClick={() => {
+                const { key } = item
+
+                if (key === undefined || key === null) return
+
+                setActiveKey(key.toString())
+                item.props.onClick?.()
+              }}
+              className={classNames(`${classPrefix}-item`, {
+                [`${classPrefix}-item-active`]: active,
+              })}
+            >
+              {renderContent()}
+            </div>
+          )
+        })}
+      </div>
+
+      {props.safeArea && <SafeArea position='bottom' />}
     </div>
   )
 }

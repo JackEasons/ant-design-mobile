@@ -1,102 +1,176 @@
 import classNames from 'classnames'
-import React, { useEffect, useState, useRef, FC } from 'react'
-import { CSSTransition } from 'react-transition-group'
-import { ElementProps } from '../../utils/element-props'
-import { useInitialized } from '../../utils/use-initialized'
+import React, { useState, useRef } from 'react'
+import type { FC, PropsWithChildren } from 'react'
+import { useIsomorphicLayoutEffect, useUnmountedRef } from 'ahooks'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
 import { mergeProps } from '../../utils/with-default-props'
 import Mask from '../mask'
 import { useLockScroll } from '../../utils/use-lock-scroll'
-import {
-  GetContainer,
-  renderToContainer,
-} from '../../utils/render-to-container'
+import { renderToContainer } from '../../utils/render-to-container'
+import { useSpring, animated } from '@react-spring/web'
+import { withStopPropagation } from '../../utils/with-stop-propagation'
+import { ShouldRender } from '../../utils/should-render'
+import { defaultPopupBaseProps, PopupBaseProps } from './popup-base-props'
+import { useInnerVisible } from '../../utils/use-inner-visible'
+import { useConfig } from '../config-provider'
+import { useDrag } from '@use-gesture/react'
 
-const classPrefix = `am-popup`
+const classPrefix = `adm-popup`
 
-export type PopupProps = {
-  visible?: boolean
-  mask?: boolean
-  onMaskClick?: (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => void
-  destroyOnClose?: boolean
-  forceRender?: boolean
-  getContainer?: GetContainer
-  afterShow?: () => void
-  afterClose?: () => void
-  position?: 'bottom' | 'top' | 'left' | 'right'
-  bodyClassName?: string
-  bodyStyle?: React.CSSProperties
-  maskClassName?: string
-  maskStyle?: React.CSSProperties
-  onClick?: (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => void
-} & ElementProps
+export type PopupProps = PopupBaseProps &
+  PropsWithChildren<{
+    position?: 'bottom' | 'top' | 'left' | 'right'
+    closeOnSwipe?: boolean
+  }> &
+  NativeProps<'--z-index'>
 
 const defaultProps = {
+  ...defaultPopupBaseProps,
+  closeOnSwipe: false,
   position: 'bottom',
-  visible: false,
-  getContainer: () => document.body,
-  mask: true,
 }
 
 export const Popup: FC<PopupProps> = p => {
-  const props = mergeProps(defaultProps, p)
-  // 动画执行完，才隐藏最外层
-  const [hidden, setHidden] = useState(!props.visible)
-
-  useEffect(() => {
-    if (props.visible) {
-      setHidden(false)
-    }
-  }, [props.visible])
-
-  const afterClose = () => {
-    setHidden(true)
-    props.afterClose?.()
-  }
-
-  const cls = classNames(classPrefix, props.className, {
-    [`${classPrefix}-hidden`]: hidden,
-  })
+  const { locale, popup: componentConfig = {} } = useConfig()
+  const props = mergeProps(defaultProps, componentConfig, p)
 
   const bodyCls = classNames(
     `${classPrefix}-body`,
     props.bodyClassName,
-    {
-      [`${classPrefix}-body-hidden`]: !props.visible,
-    },
     `${classPrefix}-body-position-${props.position}`
   )
 
-  const initialized = useInitialized(props.visible || props.forceRender)
-
+  const [active, setActive] = useState(props.visible)
   const ref = useRef<HTMLDivElement>(null)
+  useLockScroll(ref, props.disableBodyScroll && active ? 'strict' : false)
 
-  useLockScroll(ref, props.visible)
+  useIsomorphicLayoutEffect(() => {
+    if (props.visible) {
+      setActive(true)
+    }
+  }, [props.visible])
 
-  const node = (
-    <div className={cls} style={props.style} onClick={props.onClick}>
-      {props.mask && (
-        <Mask
-          visible={props.visible}
-          onMaskClick={props.onMaskClick}
-          className={props.maskClassName}
-          style={props.maskStyle}
-          disableBodyScroll={false}
-        />
-      )}
-      <CSSTransition
-        classNames={`${classPrefix}-body`}
-        in={props.visible}
-        timeout={200}
-        onEntered={props.afterShow}
-        onExited={afterClose}
-        unmountOnExit={props.destroyOnClose}
-      >
-        <div className={bodyCls} style={props.bodyStyle} ref={ref}>
-          {initialized && props.children}
-        </div>
-      </CSSTransition>
-    </div>
+  const unmountedRef = useUnmountedRef()
+  const { percent } = useSpring({
+    percent: props.visible ? 0 : 100,
+    config: {
+      precision: 0.1,
+      mass: 0.4,
+      tension: 300,
+      friction: 30,
+    },
+    onRest: () => {
+      if (unmountedRef.current) return
+      setActive(props.visible)
+      if (props.visible) {
+        props.afterShow?.()
+      } else {
+        props.afterClose?.()
+      }
+    },
+  })
+
+  const bind = useDrag(
+    ({ swipe: [, swipeY] }) => {
+      if (!props.closeOnSwipe) return
+      if (
+        (swipeY === 1 && props.position === 'bottom') ||
+        (swipeY === -1 && props.position === 'top')
+      ) {
+        props.onClose?.()
+      }
+    },
+    {
+      axis: 'y',
+      enabled: ['top', 'bottom'].includes(props.position),
+    }
   )
 
-  return renderToContainer(props.getContainer, node)
+  const maskVisible = useInnerVisible(active && props.visible)
+
+  const node = withStopPropagation(
+    props.stopPropagation,
+    withNativeProps(
+      props,
+      <div
+        className={classPrefix}
+        onClick={props.onClick}
+        style={{
+          display: active ? undefined : 'none',
+          touchAction: ['top', 'bottom'].includes(props.position)
+            ? 'none'
+            : 'auto',
+        }}
+        {...bind()}
+      >
+        {props.mask && (
+          <Mask
+            visible={maskVisible}
+            forceRender={props.forceRender}
+            destroyOnClose={props.destroyOnClose}
+            onMaskClick={e => {
+              props.onMaskClick?.(e)
+              if (props.closeOnMaskClick) {
+                props.onClose?.()
+              }
+            }}
+            className={props.maskClassName}
+            style={props.maskStyle}
+            disableBodyScroll={false}
+            stopPropagation={props.stopPropagation}
+          />
+        )}
+        <animated.div
+          className={bodyCls}
+          style={{
+            ...props.bodyStyle,
+            pointerEvents: percent.to(v => (v === 0 ? 'unset' : 'none')),
+            transform: percent.to(v => {
+              if (props.position === 'bottom') {
+                return `translate(0, ${v}%)`
+              }
+              if (props.position === 'top') {
+                return `translate(0, -${v}%)`
+              }
+              if (props.position === 'left') {
+                return `translate(-${v}%, 0)`
+              }
+              if (props.position === 'right') {
+                return `translate(${v}%, 0)`
+              }
+              return 'none'
+            }),
+          }}
+          ref={ref}
+        >
+          {props.showCloseButton && (
+            <a
+              className={classNames(
+                `${classPrefix}-close-icon`,
+                'adm-plain-anchor'
+              )}
+              onClick={() => {
+                props.onClose?.()
+              }}
+              role='button'
+              aria-label={locale.common.close}
+            >
+              {props.closeIcon}
+            </a>
+          )}
+          {props.children}
+        </animated.div>
+      </div>
+    )
+  )
+
+  return (
+    <ShouldRender
+      active={active}
+      forceRender={props.forceRender}
+      destroyOnClose={props.destroyOnClose}
+    >
+      {renderToContainer(props.getContainer, node)}
+    </ShouldRender>
+  )
 }

@@ -1,163 +1,79 @@
-const pxToRem = require('postcss-pxtorem')
+import { IConfig } from 'dumi'
+import { menus } from './menus'
+import { navs } from './navs'
 
-export default {
+const shouldDisableCSSVar = Boolean(process.env.DISABLE_CSS_VAR)
+
+if (shouldDisableCSSVar) {
+  console.info('\nCSS Variables has been disabled for dev purpose.\n')
+}
+
+const pxToRem = require('postcss-pxtorem')
+const postcssDisableCSSVars = require('../scripts/postcss-disable-css-vars.js')
+
+const config: IConfig = {
   mode: 'site',
   title: 'Ant Design Mobile',
-  logo: 'https://gw.alipayobjects.com/mdn/rms_2ddd4c/afts/img/A*XGPHS5H4-GkAAAAAAAAAAAAAARQnAQ',
-  navs: [
-    {
-      title: '指南',
-      path: '/guide',
-    },
-    {
-      title: '组件',
-      path: '/components',
-    },
-    {
-      title: '发布日志',
-      path: 'https://github.com/ant-design/ant-design-mobile/releases',
-    },
-    {
-      title: 'GitHub',
-      path: 'https://github.com/ant-design/ant-design-mobile',
-    },
-  ],
-  menus: {
-    '/': [
-      {
-        title: '首页',
-        path: 'index',
-      },
-    ],
-    '/guide': [
-      {
-        title: '快速上手',
-        path: '/guide/quick-start',
-      },
-      {
-        title: 'FAQ',
-        path: '/guide/faq',
-      },
-      {
-        title: 'CSS 变量',
-        path: '/guide/css-variables',
-      },
-      {
-        title: '主题',
-        path: '/guide/theme',
-      },
-      {
-        title: '按需加载',
-        path: '/guide/import-on-demand',
-      },
-      {
-        title: '高清适配（试验性）',
-        path: '/guide/hd',
-      },
-    ],
-    '/components': [
-      {
-        title: '基础',
-        children: [
-          '/components/button',
-          '/components/list',
-          '/components/space',
-        ],
-      },
-      {
-        title: '数据展示',
-        children: [
-          '/components/notice-bar',
-          '/components/water-mark',
-          '/components/steps',
-          '/components/tag',
-          '/components/infinite-scroll',
-          '/components/popover',
-          '/components/ellipsis',
-          '/components/badge',
-          '/components/image',
-          '/components/image-viewer',
-          '/components/card',
-        ],
-      },
-      {
-        title: '数据录入',
-        children: [
-          '/components/input',
-          '/components/text-area',
-          '/components/search',
-          '/components/checkbox',
-          '/components/radio',
-          '/components/selector',
-          '/components/switch',
-          '/components/slider',
-          '/components/picker',
-          '/components/date-picker',
-          '/components/form',
-          '/components/rate',
-        ],
-      },
-      {
-        title: '反馈',
-        children: [
-          '/components/dialog',
-          '/components/loading',
-          '/components/empty',
-          '/components/mask',
-          '/components/toast',
-          '/components/result',
-          '/components/error-block',
-          '/components/progress-bar',
-          '/components/progress-circle',
-          '/components/pull-to-refresh',
-          '/components/action-sheet',
-          '/components/collapse',
-        ],
-      },
-      {
-        title: '导航和布局',
-        children: [
-          '/components/tabs',
-          '/components/tab-bar',
-          '/components/grid',
-          '/components/dropdown',
-          '/components/popup',
-          '/components/floating-panel',
-          '/components/index-bar',
-          '/components/divider',
-        ],
-      },
-      {
-        title: '试验性',
-        children: [
-          '/components/what-is-experimental',
-          '/components/cascader',
-          '/components/desense-text',
-        ],
-      },
-    ],
-  },
+  logo: 'https://gw.alipayobjects.com/zos/bmw-prod/b874caa9-4458-412a-9ac6-a61486180a62.svg',
+  favicon:
+    'https://gw.alipayobjects.com/zos/bmw-prod/69a27fcc-ce52-4f27-83f1-c44541e9b65d.svg',
+  navs,
+  menus,
   resolve: {
     includes: ['docs', 'src'],
     passivePreview: true,
   },
   alias: {
-    'antd-mobile/lib/index.less': process.cwd() + '/src/index.less',
+    'antd-mobile/es': process.cwd() + '/src',
     'demos': process.cwd() + '/src/demos/index.ts',
   },
-  styles: [
+  metas: [
+    {
+      name: 'viewport',
+      content:
+        'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover',
+    },
+    {
+      name: 'keywords',
+      content: 'antd-mobile, ant design mobile, React mobile components',
+    },
+    {
+      name: 'description',
+      content: 'Essential UI blocks for building mobile web apps.',
+    },
+    {
+      name: 'google-site-verification',
+      content: '2saDOufpfJI4y1cqfxvuviYg8bfo4gLmiEtSnt2oh50',
+    },
+  ],
+  hash: true,
+  scripts: [
+    `if (location.pathname.startsWith('/~demos/')) {
+      document.documentElement.setAttribute('data-is-demo', 'true')
+    }`,
     `
-    #root .__dumi-default-mobile-demo-layout {
-      padding: 0;
+    if (!location.port) {
+      // Enable Google Analytics
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag('js', new Date());
+      gtag('config', 'UA-72788897-2');
     }
     `,
+    {
+      src: 'https://www.googletagmanager.com/gtag/js?id=UA-72788897-2',
+      async: true,
+    },
   ],
-  // extraPostCSSPlugins: [
-  //   pxToRem({
-  //     rootValue: 50,
-  //     propList: ['*'],
-  //   }),
-  // ],
+  locales: [
+    ['en', 'English'],
+    ['zh', '中文'],
+  ],
+  extraPostCSSPlugins: [shouldDisableCSSVar && postcssDisableCSSVars()].filter(
+    i => i
+  ),
   themeConfig: {
     hd: {
       rules: [
@@ -165,4 +81,10 @@ export default {
       ],
     },
   },
+  plugins: ['./.dumi/plugin-gallery/index.ts', './.dumi/plugin-theme/index.ts'],
+  // ssr: {},
+  exportStatic: {},
+  dynamicImport: {},
 }
+
+export default config

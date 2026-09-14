@@ -1,7 +1,8 @@
-import React, { FC } from 'react'
+import React from 'react'
+import type { FC } from 'react'
 import classNames from 'classnames'
 
-const classPrefix = `am-slider`
+const classPrefix = `adm-slider`
 
 type TicksProps = {
   points: number[]

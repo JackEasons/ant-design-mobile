@@ -1,11 +1,20 @@
-import './cascader.less'
 import { Cascader } from './cascader'
+import { prompt } from './prompt'
 import { attachPropertiesToComponent } from '../../utils/attach-properties-to-component'
-import { Multiple } from './multiple'
+import './cascader.less'
+import { optionSkeleton } from '../cascader-view/option-skeleton'
 
-export type { CascaderProps, CascaderOption } from './cascader'
-export type { MultipleProps } from './multiple'
+export type { CascaderProps, CascaderRef, CascaderActions } from './cascader'
+
+export type {
+  CascaderValue,
+  CascaderValueExtend,
+  CascaderOption,
+  CascaderViewOptionRender,
+  CascaderViewOptionRenderInfo,
+} from '../cascader-view'
 
 export default attachPropertiesToComponent(Cascader, {
-  Multiple,
+  prompt,
+  optionSkeleton,
 })

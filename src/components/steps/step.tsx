@@ -1,32 +1,35 @@
-import React, { FC } from 'react'
+import React from 'react'
+import type { FC, ReactNode } from 'react'
 import classNames from 'classnames'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
 
-const classPrefix = `am-step`
+const classPrefix = `adm-step`
 
-export interface StepProps {
-  title?: React.ReactNode
-  description?: React.ReactNode
-  icon?: React.ReactNode
+export type StepProps = {
+  title?: ReactNode
+  description?: ReactNode
+  icon?: ReactNode
   status?: 'wait' | 'process' | 'finish' | 'error'
-}
+} & NativeProps
 
 export const Step: FC<StepProps> = props => {
   const { title, description, icon, status = 'wait' } = props
 
-  return (
+  return withNativeProps(
+    props,
     <div
       className={classNames(
         `${classPrefix}`,
         `${classPrefix}-status-${status}`
       )}
     >
-      <div className='am-step-indicator'>
+      <div className={`${classPrefix}-indicator`}>
         <div className={`${classPrefix}-icon-container`}>{icon}</div>
       </div>
-      <div className='am-step-content'>
-        <div className='am-step-title'>{title}</div>
+      <div className={`${classPrefix}-content`}>
+        <div className={`${classPrefix}-title`}>{title}</div>
         {!!description && (
-          <div className='am-step-description'>{description}</div>
+          <div className={`${classPrefix}-description`}>{description}</div>
         )}
       </div>
     </div>

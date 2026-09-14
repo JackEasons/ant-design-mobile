@@ -1,13 +1,17 @@
-.am-dropdown {
-  background-color: white;
+@class-prefix-dropdown: ~'adm-dropdown';
+@class-prefix-dropdown-item: ~'adm-dropdown-item';
 
-  .am-dropdown-nav {
+.@{class-prefix-dropdown} {
+  background-color: var(--adm-color-background);
+
+  .@{class-prefix-dropdown}-nav {
     display: flex;
+    border-bottom: 1px solid transparent;
   }
 
   &-open {
-    .am-dropdown-nav {
-      border-bottom: 1px solid var(--am-border-color);
+    .@{class-prefix-dropdown}-nav {
+      border-bottom-color: var(--adm-color-border);
     }
   }
 
@@ -18,27 +22,27 @@
     min-width: 0;
     cursor: pointer;
 
-    .am-dropdown-item-title {
+    .@{class-prefix-dropdown-item}-title {
+      display: flex;
+      align-items: center;
       position: relative;
       max-width: 100%;
-      font-size: 13px;
+      font-size: var(--adm-font-size-main);
       padding: 12px;
-      span {
-        display: block;
+      &-text {
+        margin-right: 5px;
         overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
       }
-      &:after {
-        position: absolute;
-        top: 50%;
-        right: 0;
-        margin-top: -5px;
-        border: 3px solid;
-        border-color: transparent transparent var(--am-color-text)
-          var(--am-color-text);
-        transform: rotate(-45deg);
-        content: ' ';
+      &-arrow {
+        color: var(--adm-color-light);
+        font-size: 9px;
+        transform: rotate(0deg) translateY(1px);
+        transition: all ease 0.2s;
+        &-active {
+          transform: rotate(-180deg) translateY(-1px);
+        }
       }
       &:active {
         opacity: 0.7;
@@ -46,14 +50,21 @@
     }
 
     &-highlight {
-      color: var(--am-color-primary);
+      color: var(--adm-color-primary);
     }
 
     &-active {
-      color: var(--am-color-primary);
-      .am-dropdown-item-title:after {
+      .@{class-prefix-dropdown-item}-title:after {
         margin-top: -1px;
         transform: rotate(135deg);
+      }
+    }
+
+    &-content {
+      width: 100%;
+      background: var(--adm-color-background);
+      &-hidden {
+        display: none;
       }
     }
   }
@@ -66,20 +77,12 @@
     bottom: 0;
     left: 0;
 
-    .am-dropdown-popup-mask {
+    .@{class-prefix-dropdown}-popup-mask {
       position: absolute;
     }
 
-    .am-dropdown-popup-body {
+    .@{class-prefix-dropdown}-popup-body {
       position: absolute;
-    }
-  }
-
-  &-content {
-    width: 100%;
-    background: white;
-    &-hidden {
-      display: none;
     }
   }
 }

@@ -1,45 +1,107 @@
-import React, { FC } from 'react'
+import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import type {
+  ReactNode,
+  ButtonHTMLAttributes,
+  DetailedHTMLProps,
+  MouseEventHandler,
+} from 'react'
 import classNames from 'classnames'
-import Loading from '../loading'
-import { getNativeAttributes } from '../../utils/get-native-attributes'
+import DotLoading from '../dot-loading'
 import { mergeProps } from '../../utils/with-default-props'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
+import { isPromise } from '../../utils/validate'
 
-const classPrefix = `am-button`
+const classPrefix = `adm-button`
 
-export interface ButtonProps {
+type NativeButtonProps = DetailedHTMLProps<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  HTMLButtonElement
+>
+
+export type ButtonProps = {
   color?: 'default' | 'primary' | 'success' | 'warning' | 'danger'
   fill?: 'solid' | 'outline' | 'none'
   size?: 'mini' | 'small' | 'middle' | 'large'
   block?: boolean
-  loading?: boolean
+  loading?: boolean | 'auto'
   loadingText?: string
+  loadingIcon?: ReactNode
   disabled?: boolean
-  onClick?: (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => void
-  className?: string
-  style?: React.CSSProperties
+  onClick?: (
+    event: React.MouseEvent<HTMLButtonElement, MouseEvent>
+  ) => void | Promise<void>
   type?: 'submit' | 'reset' | 'button'
+  shape?: 'default' | 'rounded' | 'rectangular'
+  children?: ReactNode
+} & Pick<
+  NativeButtonProps,
+  'onMouseDown' | 'onMouseUp' | 'onTouchStart' | 'onTouchEnd' | 'id' | 'form'
+> &
+  NativeProps<
+    | '--text-color'
+    | '--background-color'
+    | '--border-radius'
+    | '--border-width'
+    | '--border-style'
+    | '--border-color'
+  >
+
+export type ButtonRef = {
+  nativeElement: HTMLButtonElement | null
 }
 
-const defaultProps = {
+const defaultProps: ButtonProps = {
   color: 'default',
   fill: 'solid',
   block: false,
   loading: false,
+  loadingIcon: <DotLoading color='currentColor' />,
   type: 'button',
+  shape: 'default',
+  size: 'middle',
 }
 
-export const Button: FC<ButtonProps> = p => {
+export const Button = forwardRef<ButtonRef, ButtonProps>((p, ref) => {
   const props = mergeProps(defaultProps, p)
-  const disabled = props.disabled
-  return (
+  const [innerLoading, setInnerLoading] = useState(false)
+  const nativeButtonRef = useRef<HTMLButtonElement>(null)
+  const loading = props.loading === 'auto' ? innerLoading : props.loading
+  const disabled = props.disabled || loading
+
+  useImperativeHandle(ref, () => ({
+    get nativeElement() {
+      return nativeButtonRef.current
+    },
+  }))
+
+  const handleClick: MouseEventHandler<HTMLButtonElement> = async e => {
+    if (!props.onClick) return
+
+    const promise = props.onClick(e)
+
+    if (isPromise(promise)) {
+      try {
+        setInnerLoading(true)
+        await promise
+        setInnerLoading(false)
+      } catch (e) {
+        setInnerLoading(false)
+        throw e
+      }
+    }
+  }
+
+  return withNativeProps(
+    props,
     <button
-      {...getNativeAttributes(props)}
+      ref={nativeButtonRef}
       type={props.type}
-      onClick={props.onClick}
+      form={props.form}
+      onClick={handleClick}
       className={classNames(
         classPrefix,
-        props.color ? `${classPrefix}-${props.color}` : null,
         {
+          [`${classPrefix}-${props.color}`]: props.color,
           [`${classPrefix}-block`]: props.block,
           [`${classPrefix}-disabled`]: disabled,
           [`${classPrefix}-fill-outline`]: props.fill === 'outline',
@@ -47,23 +109,24 @@ export const Button: FC<ButtonProps> = p => {
           [`${classPrefix}-mini`]: props.size === 'mini',
           [`${classPrefix}-small`]: props.size === 'small',
           [`${classPrefix}-large`]: props.size === 'large',
-          [`${classPrefix}-loading`]: props.loading,
+          [`${classPrefix}-loading`]: loading,
         },
-        props.className
+        `${classPrefix}-shape-${props.shape}`
       )}
-      style={props.style}
       disabled={disabled}
+      onMouseDown={props.onMouseDown}
+      onMouseUp={props.onMouseUp}
+      onTouchStart={props.onTouchStart}
+      onTouchEnd={props.onTouchEnd}
     >
-      {props.loading ? (
-        <>
-          <div className={`${classPrefix}-loading-wrapper`}>
-            <Loading color='currentColor' size={props.size} />
-            {props.loadingText}
-          </div>
-        </>
+      {loading ? (
+        <div className={`${classPrefix}-loading-wrapper`}>
+          {props.loadingIcon}
+          {props.loadingText}
+        </div>
       ) : (
-        props.children
+        <span>{props.children}</span>
       )}
     </button>
   )
-}
+})

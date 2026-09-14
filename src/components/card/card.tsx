@@ -1,17 +1,23 @@
-import { FC, ReactNode } from 'react'
-import React from 'react'
 import classNames from 'classnames'
-import { ElementProps } from '../../utils/element-props'
+import type { CSSProperties, FC, ReactNode } from 'react'
+import React from 'react'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
 
-const classPrefix = `am-card`
+const classPrefix = `adm-card`
 
 export type CardProps = {
   title?: ReactNode
+  icon?: ReactNode
   extra?: ReactNode
-  onClick?: (event: React.MouseEvent) => void
-  onBodyClick?: (event: React.MouseEvent) => void
-  onHeaderClick?: (event: React.MouseEvent) => void
-} & ElementProps
+  headerStyle?: CSSProperties
+  headerClassName?: string
+  bodyStyle?: CSSProperties
+  bodyClassName?: string
+  onClick?: (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => void
+  onBodyClick?: (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => void
+  onHeaderClick?: (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => void
+  children?: ReactNode
+} & NativeProps
 
 export const Card: FC<CardProps> = props => {
   const renderHeader = () => {
@@ -20,11 +26,17 @@ export const Card: FC<CardProps> = props => {
     }
     return (
       <div
-        className={classNames(`${classPrefix}-header`)}
+        className={classNames(`${classPrefix}-header`, props.headerClassName)}
+        style={props.headerStyle}
         onClick={props.onHeaderClick}
       >
+        {props.icon && (
+          <div className={`${classPrefix}-header-icon`}>{props.icon}</div>
+        )}
         <div className={`${classPrefix}-header-title`}>{props.title}</div>
-        {props.extra}
+        {props.extra && (
+          <div className={`${classPrefix}-header-extra`}>{props.extra}</div>
+        )}
       </div>
     )
   }
@@ -34,18 +46,19 @@ export const Card: FC<CardProps> = props => {
       return null
     }
     return (
-      <div className={`${classPrefix}-body`} onClick={props.onBodyClick}>
+      <div
+        className={classNames(`${classPrefix}-body`, props.bodyClassName)}
+        style={props.bodyStyle}
+        onClick={props.onBodyClick}
+      >
         {props.children}
       </div>
     )
   }
 
-  return (
-    <div
-      className={classNames(classPrefix, props.className)}
-      onClick={props.onClick}
-      style={props.style}
-    >
+  return withNativeProps(
+    props,
+    <div className={classPrefix} onClick={props.onClick}>
       {renderHeader()}
       {renderBody()}
     </div>

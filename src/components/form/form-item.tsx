@@ -1,41 +1,79 @@
-import React, { FC, useContext } from 'react'
+import { QuestionCircleOutline } from 'antd-mobile-icons'
 import classNames from 'classnames'
-import { ElementProps } from '../../utils/element-props'
 import { Field, FormInstance } from 'rc-field-form'
 import type { FieldProps } from 'rc-field-form/lib/Field'
 import FieldContext from 'rc-field-form/lib/FieldContext'
-import type { Meta } from 'rc-field-form/lib/interface'
-
-import { FormContext } from './context'
-import { toArray } from './utils'
+import type { InternalNamePath, Meta } from 'rc-field-form/lib/interface'
+import type { FC, MutableRefObject, ReactNode } from 'react'
+import React, { useCallback, useContext, useRef, useState } from 'react'
+import { devWarning } from '../../utils/dev-log'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
+import { undefinedFallback } from '../../utils/undefined-fallback'
+import { mergeProps } from '../../utils/with-default-props'
+import { useConfig } from '../config-provider'
 import List, { ListItemProps } from '../list'
+import Popover from '../popover'
+import { FormContext, NoStyleItemContext } from './context'
 import type { FormLayout } from './index'
+import { isSafeSetRefComponent, toArray } from './utils'
 
-type RenderChildren<Values = any> = (
-  form: FormInstance<Values>
-) => React.ReactNode
-type ChildrenType<Values = any> = RenderChildren<Values> | React.ReactNode
+const NAME_SPLIT = '__SPLIT__'
+
+type RenderChildren<Values = any> = (form: FormInstance<Values>) => ReactNode
+type ChildrenType<Values = any> = RenderChildren<Values> | ReactNode
+
+function useChildren(children?: ChildrenType): ChildrenType {
+  if (typeof children === 'function') {
+    return children
+  }
+
+  const childList = toArray(children)
+  return childList.length <= 1 ? childList[0] : childList
+}
 
 type RcFieldProps = Omit<FieldProps, 'children'>
 
-const classPrefix = `am-form-item`
+const classPrefix = `adm-form-item`
 
-export type FormItemProps = RcFieldProps &
-  ElementProps &
-  Pick<ListItemProps, 'style' | 'onClick'> & {
-    label?: string
-    help?: string
+export type FormItemProps = Pick<
+  RcFieldProps,
+  | 'dependencies'
+  | 'valuePropName'
+  | 'name'
+  | 'rules'
+  | 'messageVariables'
+  | 'trigger'
+  | 'validateTrigger'
+  | 'shouldUpdate'
+  | 'initialValue'
+  | 'getValueFromEvent'
+  | 'getValueProps'
+  | 'normalize'
+  | 'preserve'
+  | 'validateFirst'
+> &
+  Pick<
+    ListItemProps,
+    'style' | 'extra' | 'clickable' | 'arrow' | 'arrowIcon' | 'description'
+  > & {
+    label?: ReactNode
+    help?: ReactNode
+    helpIcon?: ReactNode
     hasFeedback?: boolean
     required?: boolean
     noStyle?: boolean
     disabled?: boolean
-    children: ChildrenType
-  }
+    hidden?: boolean
+    layout?: FormLayout
+    childElementPosition?: 'normal' | 'right'
+    children?: ChildrenType
+    onClick?: (e: React.MouseEvent, widgetRef: MutableRefObject<any>) => void
+  } & NativeProps
 
 interface MemoInputProps {
   value: any
   update: number
-  children: React.ReactNode
+  children: ReactNode
 }
 
 const MemoInput = React.memo(
@@ -52,60 +90,153 @@ type FormItemLayoutProps = Pick<
   | 'disabled'
   | 'label'
   | 'help'
-  | 'onClick'
+  | 'helpIcon'
+  | 'hidden'
+  | 'layout'
+  | 'extra'
+  | 'clickable'
+  | 'arrow'
+  | 'arrowIcon'
+  | 'description'
+  | 'childElementPosition'
 > & {
+  onClick?: (e: React.MouseEvent) => void
   htmlFor?: string
-  meta?: Meta
-  layout?: FormLayout
-}
+  errors: string[]
+  warnings: string[]
+  children: ReactNode
+} & NativeProps
 
-const FormItemLayout: React.FC<FormItemLayoutProps> = props => {
+const FormItemLayout: FC<FormItemLayoutProps> = props => {
+  const { locale, form: componentConfig = {} } = useConfig()
+
   const {
-    className,
     style,
+    extra,
     label,
     help,
+    helpIcon,
     required,
-    disabled,
-    meta,
     children,
     htmlFor,
-  } = props
+    hidden,
+    arrow,
+    arrowIcon,
+    childElementPosition = 'normal',
+  } = mergeProps(componentConfig, props)
 
   const context = useContext(FormContext)
 
-  const hasFeedback = props.hasFeedback || context.hasFeedback
+  const hasFeedback =
+    props.hasFeedback !== undefined ? props.hasFeedback : context.hasFeedback
   const layout = props.layout || context.layout
+  const disabled = props.disabled ?? context.disabled
 
-  const formItemLabelClass = classNames(`${classPrefix}-label`, {
-    [`${classPrefix}-label-disable`]: disabled,
-  })
+  const requiredMark = (() => {
+    const { requiredMarkStyle } = context
+    switch (requiredMarkStyle) {
+      case 'asterisk':
+        return (
+          required && (
+            <span className={`${classPrefix}-required-asterisk`}>*</span>
+          )
+        )
+      case 'text-required':
+        return (
+          required && (
+            <span className={`${classPrefix}-required-text`}>
+              ({locale.Form.required})
+            </span>
+          )
+        )
+      case 'text-optional':
+        return (
+          !required && (
+            <span className={`${classPrefix}-required-text`}>
+              ({locale.Form.optional})
+            </span>
+          )
+        )
+      case 'none':
+        return null
+      default:
+        return null
+    }
+  })()
 
-  const feedback =
-    hasFeedback && meta && meta.errors.length > 0 ? meta.errors[0] : null
-
-  const labelElement = (
-    <label className={formItemLabelClass} htmlFor={htmlFor}>
-      {required && <span className={`${classPrefix}-label-required`}>*</span>}
+  const labelElement = !!label && (
+    <label className={`${classPrefix}-label`} htmlFor={htmlFor}>
       {label}
-      {help && <span className={`${classPrefix}-label-help`}>{help}</span>}
+      {requiredMark}
+      {help && (
+        <Popover content={help} mode='dark' trigger='click'>
+          <span
+            className={`${classPrefix}-label-help`}
+            onClick={e => {
+              e.stopPropagation()
+              e.preventDefault()
+            }}
+          >
+            {helpIcon || <QuestionCircleOutline />}
+          </span>
+        </Popover>
+      )}
     </label>
   )
 
-  const descriptionElement = feedback && (
-    <div className={`${classPrefix}-footer`}>{feedback}</div>
+  const description = (!!props.description || hasFeedback) && (
+    <>
+      {props.description}
+      {hasFeedback && (
+        <>
+          {props.errors.map((error, index) => (
+            <div
+              key={`error-${index}`}
+              className={`${classPrefix}-feedback-error`}
+            >
+              {error}
+            </div>
+          ))}
+          {props.warnings.map((warning, index) => (
+            <div
+              key={`warning-${index}`}
+              className={`${classPrefix}-feedback-warning`}
+            >
+              {warning}
+            </div>
+          ))}
+        </>
+      )}
+    </>
   )
 
-  return (
+  return withNativeProps(
+    props,
     <List.Item
       style={style}
       title={layout === 'vertical' && labelElement}
       prefix={layout === 'horizontal' && labelElement}
-      description={descriptionElement}
-      className={classNames(classPrefix, className)}
+      extra={extra}
+      description={description}
+      className={classNames(classPrefix, `${classPrefix}-${layout}`, {
+        [`${classPrefix}-hidden`]: hidden,
+        [`${classPrefix}-has-error`]: props.errors.length,
+      })}
+      disabled={disabled}
       onClick={props.onClick}
+      clickable={props.clickable}
+      arrowIcon={arrowIcon || arrow}
     >
-      {children}
+      <div
+        className={classNames(
+          `${classPrefix}-child`,
+          `${classPrefix}-child-position-${childElementPosition}`
+        )}
+      >
+        <div className={classNames(`${classPrefix}-child-inner`)}>
+          {children}
+        </div>
+      </div>
     </List.Item>
   )
 }
@@ -113,126 +244,237 @@ const FormItemLayout: React.FC<FormItemLayoutProps> = props => {
 export const FormItem: FC<FormItemProps> = props => {
   const {
     // 样式相关
-    className,
     style,
     // FormItem 相关
-    label: displayLabel,
+    label,
     help,
+    helpIcon,
+    extra,
     hasFeedback,
     name,
     required,
     noStyle,
+    hidden,
+    layout,
+    childElementPosition,
+    description,
     // Field 相关
     disabled,
     rules,
     children,
     messageVariables,
     trigger = 'onChange',
-    validateTrigger,
+    validateTrigger = trigger,
     onClick,
+    shouldUpdate,
+    dependencies,
+    clickable,
+    arrow,
+    arrowIcon,
     ...fieldProps
   } = props
 
-  const { validateTrigger: contextValidateTrigger } =
-    React.useContext(FieldContext)
-  const mergedValidateTrigger =
-    validateTrigger !== undefined ? validateTrigger : contextValidateTrigger
+  const mergedChildren = useChildren(children)
 
-  const updateRef = React.useRef(0)
+  const { name: formName } = useContext(FormContext)
+  const { validateTrigger: contextValidateTrigger } = useContext(FieldContext)
+
+  const mergedValidateTrigger = undefinedFallback(
+    validateTrigger,
+    contextValidateTrigger,
+    trigger
+  )
+
+  const widgetRef = useRef<any>(null)
+
+  const updateRef = useRef(0)
   updateRef.current += 1
 
-  // 如果 label 未设置，那么尝试使用 name 作为 label
-  const label = displayLabel
-    ? displayLabel
-    : typeof name === 'string'
-    ? name
-    : undefined
+  const [subMetas, setSubMetas] = useState<Record<string, Meta>>({})
+  const onSubMetaChange = useCallback(
+    (subMeta: Meta & { destroy?: boolean }, namePath: InternalNamePath) => {
+      setSubMetas(prevSubMetas => {
+        const nextSubMetas = { ...prevSubMetas }
+        const nameKey = namePath.join(NAME_SPLIT)
+        if (subMeta.destroy) {
+          delete nextSubMetas[nameKey]
+        } else {
+          nextSubMetas[nameKey] = subMeta
+        }
+        return nextSubMetas
+      })
+    },
+    [setSubMetas]
+  )
 
   function renderLayout(
-    baseChildren: React.ReactNode,
+    baseChildren: ReactNode,
     fieldId?: string,
     meta?: Meta,
     isRequired?: boolean
   ) {
-    if (noStyle) {
+    if (noStyle && !hidden) {
       return baseChildren
     }
 
-    return (
+    const curErrors = meta?.errors ?? []
+    const errors = Object.keys(subMetas).reduce(
+      (subErrors: string[], key: string) => {
+        const errors = subMetas[key]?.errors ?? []
+        if (errors.length) {
+          subErrors = [...subErrors, ...errors]
+        }
+        return subErrors
+      },
+      curErrors
+    )
+    const curWarnings = meta?.warnings ?? []
+    const warnings = Object.keys(subMetas).reduce(
+      (subWarnings: string[], key: string) => {
+        const warnings = subMetas[key]?.warnings ?? []
+        if (warnings.length) {
+          subWarnings = [...subWarnings, ...warnings]
+        }
+        return subWarnings
+      },
+      curWarnings
+    )
+
+    return withNativeProps(
+      props,
       <FormItemLayout
-        className={className}
         style={style}
         label={label}
+        extra={extra}
         help={help}
+        helpIcon={helpIcon}
+        description={description}
         required={isRequired}
         disabled={disabled}
         hasFeedback={hasFeedback}
         htmlFor={fieldId}
-        meta={meta}
-        onClick={onClick}
+        errors={errors}
+        warnings={warnings}
+        onClick={onClick && (e => onClick(e, widgetRef))}
+        hidden={hidden}
+        layout={layout}
+        childElementPosition={childElementPosition}
+        clickable={clickable}
+        arrow={arrow}
+        arrowIcon={arrowIcon}
       >
-        {baseChildren}
+        <NoStyleItemContext.Provider value={onSubMetaChange}>
+          {baseChildren}
+        </NoStyleItemContext.Provider>
       </FormItemLayout>
     )
   }
 
-  const isRenderProps = typeof children === 'function'
+  const isRenderProps = typeof mergedChildren === 'function'
 
   if (!name && !isRenderProps && !props.dependencies) {
-    return renderLayout(children) as JSX.Element
+    return renderLayout(mergedChildren) as JSX.Element
   }
 
-  let variables: Record<string, string> = {}
-  if (typeof label === 'string') {
-    variables.label = label
-  }
+  let Variables: Record<string, string> = {}
+  Variables.label = typeof label === 'string' ? label : ''
   if (messageVariables) {
-    variables = { ...variables, ...messageVariables }
+    Variables = { ...Variables, ...messageVariables }
+  }
+
+  const notifyParentMetaChange = useContext(NoStyleItemContext)
+  const onMetaChange = (meta: Meta & { destroy?: boolean }) => {
+    if (noStyle && notifyParentMetaChange) {
+      const namePath = meta.name
+      notifyParentMetaChange(meta, namePath)
+    }
   }
 
   return (
     <Field
       {...fieldProps}
       name={name}
+      shouldUpdate={shouldUpdate}
+      dependencies={dependencies}
       rules={rules}
       trigger={trigger}
       validateTrigger={mergedValidateTrigger}
+      onMetaChange={onMetaChange}
+      messageVariables={Variables}
     >
       {(control, meta, context) => {
-        let childNode: React.ReactNode = null
+        let childNode: ReactNode = null
 
         const isRequired =
           required !== undefined
             ? required
-            : !!(
-                rules &&
-                rules.some(rule => {
-                  if (rule && typeof rule === 'object' && rule.required) {
-                    return true
-                  }
-                  return false
-                })
+            : rules &&
+              rules.some(
+                rule => !!(rule && typeof rule === 'object' && rule.required)
               )
 
-        const fieldId = (toArray(name).length && meta ? meta.name : []).join(
-          '_'
-        )
+        const nameList = toArray(name).length && meta ? meta.name : []
+        const fieldId = (
+          nameList.length > 0 && formName ? [formName, ...nameList] : nameList
+        ).join('_')
 
-        if (
-          isRenderProps &&
-          (props.shouldUpdate || props.dependencies) &&
-          !name
-        ) {
-          childNode = (children as RenderChildren)(context)
-        } else if (React.isValidElement(children)) {
-          const childProps = { ...children.props, ...control }
+        if (shouldUpdate && dependencies) {
+          devWarning(
+            'Form.Item',
+            "`shouldUpdate` and `dependencies` shouldn't be used together."
+          )
+        }
+
+        if (isRenderProps) {
+          if ((shouldUpdate || dependencies) && !name) {
+            childNode = (mergedChildren as RenderChildren)(context)
+          } else {
+            if (!(shouldUpdate || dependencies)) {
+              devWarning(
+                'Form.Item',
+                '`children` of render props only work with `shouldUpdate` or `dependencies`.'
+              )
+            }
+            if (name) {
+              devWarning(
+                'Form.Item',
+                "Do not use `name` with `children` of render props since it's not a field."
+              )
+            }
+          }
+
+          // not render props
+        } else if (dependencies && !name) {
+          devWarning(
+            'Form.Item',
+            'Must set `name` or use render props when `dependencies` is set.'
+          )
+        } else if (React.isValidElement(mergedChildren)) {
+          if (mergedChildren.props.defaultValue) {
+            devWarning(
+              'Form.Item',
+              '`defaultValue` will not work on controlled Field. You should use `initialValues` of Form instead.'
+            )
+          }
+          const childProps = { ...mergedChildren.props, ...control }
+
+          if (isSafeSetRefComponent(mergedChildren)) {
+            childProps.ref = (instance: any) => {
+              const originRef = (mergedChildren as any).ref
+              if (originRef) {
+                if (typeof originRef === 'function') {
+                  originRef(instance)
+                }
+                if ('current' in originRef) {
+                  originRef.current = instance
+                }
+              }
+              widgetRef.current = instance
+            }
+          }
 
           if (!childProps.id) {
             childProps.id = fieldId
-          }
-
-          if (disabled) {
-            childProps.disabled = disabled
           }
 
           // We should keep user origin event handler
@@ -244,7 +486,7 @@ export const FormItem: FC<FormItemProps> = props => {
           triggers.forEach(eventName => {
             childProps[eventName] = (...args: any[]) => {
               control[eventName]?.(...args)
-              children.props[eventName]?.(...args)
+              mergedChildren.props[eventName]?.(...args)
             }
           })
 
@@ -253,11 +495,17 @@ export const FormItem: FC<FormItemProps> = props => {
               value={control[props.valuePropName || 'value']}
               update={updateRef.current}
             >
-              {React.cloneElement(children, childProps)}
+              {React.cloneElement(mergedChildren, childProps)}
             </MemoInput>
           )
         } else {
-          childNode = children
+          if (name) {
+            devWarning(
+              'Form.Item',
+              '`name` is only used for validate React element. If you are using Form.Item as layout display, please remove `name` instead.'
+            )
+          }
+          childNode = mergedChildren
         }
 
         return renderLayout(childNode, fieldId, meta, isRequired)

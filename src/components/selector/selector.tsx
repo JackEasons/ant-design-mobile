@@ -1,43 +1,78 @@
 import classNames from 'classnames'
-import React, { FC } from 'react'
-import { ElementProps } from '../../utils/element-props'
+import React from 'react'
+import type { ReactNode } from 'react'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
 import { mergeProps } from '../../utils/with-default-props'
 import Space from '../space'
-import Grid from '../grid'
-import { convertPx } from '../../utils/convert-px'
-import selectorCheckMarkImg from '../../assets/selector-check-mark.svg'
-import { useNewControllableValue } from '../../utils/use-controllable-value'
+import Grid, { GridProps } from '../grid'
+import { usePropsValue } from '../../utils/use-props-value'
+import { CheckMark } from './check-mark'
+import { useConfig } from '../config-provider'
+import { useFieldNames } from '../../hooks'
+import type { FieldNamesType, BaseOptionType } from '../../hooks'
 
-const classPrefix = `am-selector`
+const classPrefix = `adm-selector`
 
-export interface SelectorOption {
-  label: string
-  value: string
+type SelectorValue = string | number
+
+export type SelectorOption<V> = {
+  label?: ReactNode
+  description?: ReactNode
+  value?: V
   disabled?: boolean
-}
+} & BaseOptionType
 
-export type SelectorProps = {
-  options: SelectorOption[]
-  columns?: number
+export type SelectorProps<V> = {
+  options: SelectorOption<V>[]
+  columns?: GridProps['columns']
   multiple?: boolean
   disabled?: boolean
-  defaultValue?: string[]
-  value?: string[]
-  onChange?: (v: string[]) => void
-} & ElementProps
+  defaultValue?: V[]
+  value?: V[]
+  onChange?: (v: V[], extend: { items: SelectorOption<V>[] }) => void
+  showCheckMark?: boolean
+  fieldNames?: FieldNamesType
+} & NativeProps<
+  | '--color'
+  | '--checked-color'
+  | '--text-color'
+  | '--checked-text-color'
+  | '--border'
+  | '--checked-border'
+  | '--border-radius'
+  | '--padding'
+  | '--gap'
+  | '--gap-vertical'
+  | '--gap-horizontal'
+>
 
 const defaultProps = {
   multiple: false,
   defaultValue: [],
+  showCheckMark: true,
 }
 
-export const Selector: FC<SelectorProps> = p => {
+export const Selector = <V extends SelectorValue>(p: SelectorProps<V>) => {
   const props = mergeProps(defaultProps, p)
-  const [value, setValue] = useNewControllableValue(props)
+  const [labelName, valueName, , disabledName] = useFieldNames(props.fieldNames)
+  const [value, setValue] = usePropsValue({
+    value: props.value,
+    defaultValue: props.defaultValue,
+    onChange: val => {
+      const extend = {
+        get items() {
+          return props.options.filter(option => val.includes(option[valueName]))
+        },
+      }
+      props.onChange?.(val, extend)
+    },
+  })
 
-  const seletorItems = props.options.map(option => {
-    const active = (value || []).includes(option.value)
-    const disabled = option.disabled || props.disabled
+  const { locale } = useConfig()
+
+  const items = props.options.map(option => {
+    const active = (value || []).includes(option[valueName])
+    const disabled = option[disabledName] || props.disabled
     const itemCls = classNames(`${classPrefix}-item`, {
       [`${classPrefix}-item-active`]: active && !props.multiple,
       [`${classPrefix}-item-multiple-active`]: active && props.multiple,
@@ -46,43 +81,53 @@ export const Selector: FC<SelectorProps> = p => {
 
     return (
       <div
-        key={option.value}
+        key={option[valueName]}
         className={itemCls}
         onClick={() => {
           if (disabled) {
             return
           }
           if (props.multiple) {
-            setValue(
-              active
-                ? value.filter(v => v !== option.value)
-                : [...value, option.value]
-            )
+            const val = active
+              ? value.filter(v => v !== option[valueName])
+              : [...value, option[valueName]]
+            setValue(val)
           } else {
-            setValue(active ? [] : [option.value])
+            const val = active ? [] : [option[valueName]]
+            setValue(val)
           }
         }}
+        role='option'
+        aria-selected={
+          (active && !props.multiple) || (active && props.multiple)
+        }
       >
-        {option.label}
-        {active && props.multiple && (
+        {option[labelName]}
+        {option.description && (
+          <div className={`${classPrefix}-item-description`}>
+            {option.description}
+          </div>
+        )}
+        {active && props.showCheckMark && (
           <div className={`${classPrefix}-check-mark-wrapper`}>
-            <img src={selectorCheckMarkImg} />
+            <CheckMark />
           </div>
         )}
       </div>
     )
   })
 
-  return (
+  return withNativeProps(
+    props,
     <div
-      className={classNames(classPrefix, props.className)}
-      style={props.style}
+      className={classPrefix}
+      role='listbox'
+      aria-label={locale.Selector.name}
     >
-      {!props.columns && <Space wrap>{seletorItems}</Space>}
-      {props.columns && (
-        <Grid columns={props.columns} gap={convertPx(8)}>
-          {seletorItems}
-        </Grid>
+      {props.columns ? (
+        <Grid columns={props.columns}>{items}</Grid>
+      ) : (
+        <Space wrap>{items}</Space>
       )}
     </div>
   )

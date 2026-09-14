@@ -1,12 +1,16 @@
-import React, { FC, useContext } from 'react'
-import { ElementProps } from '../../utils/element-props'
 import classNames from 'classnames'
-import { CheckOutlined } from '@ant-design/icons'
-import { RadioGroupContext } from './group-context'
-import { useNewControllableValue } from '../../utils/use-controllable-value'
+import type { FC, ReactNode } from 'react'
+import React, { useContext } from 'react'
+import { devWarning } from '../../utils/dev-log'
+import { isDev } from '../../utils/is-dev'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
+import { usePropsValue } from '../../utils/use-props-value'
 import { mergeProps } from '../../utils/with-default-props'
+import { CheckIcon } from '../checkbox/check-icon'
+import { NativeInput } from '../checkbox/native-input'
+import { RadioGroupContext } from './group-context'
 
-const classPrefix = `am-radio`
+const classPrefix = `adm-radio`
 
 export type RadioValue = string | number
 
@@ -17,7 +21,11 @@ export type RadioProps = {
   onChange?: (checked: boolean) => void
   value?: RadioValue
   block?: boolean
-} & ElementProps
+  id?: string
+  icon?: (checked: boolean) => ReactNode
+  children?: ReactNode
+  onClick?: (event: React.MouseEvent<HTMLLabelElement, MouseEvent>) => void
+} & NativeProps<'--icon-size' | '--font-size' | '--gap'>
 
 const defaultProps = {
   defaultChecked: false,
@@ -27,51 +35,74 @@ export const Radio: FC<RadioProps> = p => {
   const props = mergeProps(defaultProps, p)
   const groupContext = useContext(RadioGroupContext)
 
-  let [checked, setChecked] = useNewControllableValue<boolean>({
+  let [checked, setChecked] = usePropsValue<boolean>({
     value: props.checked,
     defaultValue: props.defaultChecked,
     onChange: props.onChange,
-  })
+  }) as [boolean, (v: boolean) => void]
   let disabled = props.disabled
 
   const { value } = props
   if (groupContext && value !== undefined) {
+    if (isDev) {
+      if (p.checked !== undefined) {
+        devWarning(
+          'Radio',
+          'When used within `Radio.Group`, the `checked` prop of `Radio` will not work.'
+        )
+      }
+      if (p.defaultChecked !== undefined) {
+        devWarning(
+          'Radio',
+          'When used within `Radio.Group`, the `defaultChecked` prop of `Radio` will not work.'
+        )
+      }
+    }
+
     checked = groupContext.value.includes(value)
-    setChecked = (checked: boolean) => {
-      if (checked) {
+    setChecked = (innerChecked: boolean) => {
+      if (innerChecked) {
         groupContext.check(value)
       } else {
         groupContext.uncheck(value)
       }
-      props.onChange?.(checked)
+      props.onChange?.(innerChecked)
     }
     disabled = disabled || groupContext.disabled
   }
 
-  return (
+  const renderIcon = () => {
+    if (props.icon) {
+      return (
+        <div className={`${classPrefix}-custom-icon`}>
+          {props.icon(checked)}
+        </div>
+      )
+    }
+
+    return (
+      <div className={`${classPrefix}-icon`}>{checked && <CheckIcon />}</div>
+    )
+  }
+
+  return withNativeProps(
+    props,
     <label
-      className={classNames(classPrefix, props.className, {
+      onClick={props.onClick}
+      className={classNames(classPrefix, {
         [`${classPrefix}-checked`]: checked,
         [`${classPrefix}-disabled`]: disabled,
         [`${classPrefix}-block`]: props.block,
       })}
-      style={props.style}
     >
-      <input
+      <NativeInput
         type='radio'
         checked={checked}
-        onChange={e => {
-          setChecked(e.target.checked)
-        }}
-        onClick={e => {
-          e.stopPropagation()
-          e.nativeEvent.stopImmediatePropagation()
-        }}
+        onChange={setChecked}
         disabled={disabled}
+        id={props.id}
       />
-      <div className={`${classPrefix}-icon`}>
-        <CheckOutlined className={`${classPrefix}-icon-checked`} />
-      </div>
+      {renderIcon()}
       {props.children && (
         <div className={`${classPrefix}-content`}>{props.children}</div>
       )}

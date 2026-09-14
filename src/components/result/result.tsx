@@ -1,51 +1,37 @@
-import React, { FC } from 'react'
+import React from 'react'
+import type { FC, ReactNode } from 'react'
 import classNames from 'classnames'
-import {
-  CheckCircleFilled,
-  CloseCircleFilled,
-  InfoCircleFilled,
-  ClockCircleFilled,
-  ExclamationCircleFilled,
-} from '@ant-design/icons'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
+import { mergeProps } from '../../utils/with-default-props'
+import { useResultIcon } from './use-result-icon'
 
-const classPrefix = `am-result`
+const classPrefix = `adm-result`
 
-const ICONS = {
-  success: CheckCircleFilled,
-  error: CloseCircleFilled,
-  info: InfoCircleFilled,
-  waiting: ClockCircleFilled,
-  warning: ExclamationCircleFilled,
+const defaultProps = {
+  status: 'info',
 }
 
-export interface ResultProps {
-  status: 'success' | 'error' | 'info' | 'waiting' | 'warning'
-  title: string
-  description?: string
-  className?: string
-  style?: React.CSSProperties
-}
+export type ResultProps = {
+  status?: 'success' | 'error' | 'info' | 'waiting' | 'warning'
+  title: ReactNode
+  description?: ReactNode
+  icon?: ReactNode
+} & NativeProps
 
-export const Result: FC<ResultProps> = props => {
-  const { className, style, status, title, description } = props
-  const ResultIcon = ICONS[status]
+export const Result: FC<ResultProps> = p => {
+  const props = mergeProps(defaultProps, p)
+  const { status, title, description, icon } = props
+  const fallbackIcon = useResultIcon(status)
+  if (!status) return null
 
-  return (
-    <div
-      className={classNames(classPrefix, `${classPrefix}-${status}`, className)}
-      style={style}
-    >
-      <div className={`${classPrefix}-icon`}>
-        <ResultIcon />
-      </div>
+  return withNativeProps(
+    props,
+    <div className={classNames(classPrefix, `${classPrefix}-${status}`)}>
+      <div className={`${classPrefix}-icon`}>{icon || fallbackIcon}</div>
       <div className={`${classPrefix}-title`}>{title}</div>
-      {description ? (
+      {!!description && (
         <div className={`${classPrefix}-description`}>{description}</div>
-      ) : null}
+      )}
     </div>
   )
-}
-
-Result.defaultProps = {
-  description: '',
 }

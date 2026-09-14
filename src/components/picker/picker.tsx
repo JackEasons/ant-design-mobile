@@ -1,156 +1,230 @@
-import React, { useState, useEffect, ReactNode, useMemo, FC } from 'react'
-import Popup, { PopupProps } from '../popup'
-import { Column } from './column'
-import { mergeProps, withDefaultProps } from '../../utils/with-default-props'
-import { ElementProps } from '../../utils/element-props'
+import React, {
+  useState,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+  memo,
+} from 'react'
+import type { ReactNode, CSSProperties } from 'react'
 import classNames from 'classnames'
-import { useNewControllableValue } from '../../utils/use-controllable-value'
+import Popup, { PopupProps } from '../popup'
+import { mergeProps } from '../../utils/with-default-props'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
+import { usePropsValue } from '../../utils/use-props-value'
+import {
+  PickerColumn,
+  PickerColumnItem,
+  PickerValue,
+  PickerValueExtend,
+} from './index'
+import PickerView from '../picker-view'
+import {
+  generateColumnsExtend,
+  useColumnsExtend,
+} from '../picker-view/columns-extend'
+import { useConfig } from '../config-provider'
+import { useMemoizedFn } from 'ahooks'
+import SafeArea from '../safe-area'
+import { defaultRenderLabel } from './picker-utils'
 
-const classPrefix = `am-picker`
-
-export type PickerValue = string | null
-
-export type PickerColumnItem = {
-  label: string
-  value: string
+export type PickerActions = {
+  open: () => void
+  close: () => void
+  toggle: () => void
 }
+export type PickerRef = PickerActions
 
-export type PickerColumn = (string | PickerColumnItem)[]
+const classPrefix = `adm-picker`
 
 export type PickerProps = {
   columns: PickerColumn[] | ((value: PickerValue[]) => PickerColumn[])
   value?: PickerValue[]
   defaultValue?: PickerValue[]
-  onSelect?: (value: PickerValue[]) => void
-  onConfirm?: (value: PickerValue[]) => void
+  loading?: boolean
+  loadingContent?: ReactNode
+  onSelect?: (value: PickerValue[], extend: PickerValueExtend) => void
+  onConfirm?: (value: PickerValue[], extend: PickerValueExtend) => void
   onCancel?: () => void
   onClose?: () => void
+  closeOnMaskClick?: boolean
   visible?: boolean
-  confirmText?: string
-  cancelText?: string
-  children?: (items: (PickerColumnItem | null)[]) => ReactNode
-} & Pick<PopupProps, 'getContainer' | 'afterShow' | 'afterClose' | 'onClick'> &
-  ElementProps
+  title?: ReactNode
+  confirmText?: ReactNode
+  cancelText?: ReactNode
+  children?: (
+    items: (PickerColumnItem | null)[],
+    actions: PickerActions
+  ) => ReactNode
+  renderLabel?: (item: PickerColumnItem) => ReactNode
+  mouseWheel?: boolean
+  popupClassName?: string
+  popupStyle?: CSSProperties
+} & Pick<
+  PopupProps,
+  | 'getContainer'
+  | 'afterShow'
+  | 'afterClose'
+  | 'onClick'
+  | 'stopPropagation'
+  | 'forceRender'
+  | 'destroyOnClose'
+> &
+  NativeProps<
+    | '--header-button-font-size'
+    | '--title-font-size'
+    | '--item-font-size'
+    | '--item-height'
+  >
 
 const defaultProps = {
   defaultValue: [],
+  closeOnMaskClick: true,
+  renderLabel: defaultRenderLabel,
+  destroyOnClose: false,
+  forceRender: false,
 }
 
-export const Picker = withDefaultProps({
-  confirmText: '确定',
-  cancelText: '取消',
-})<PickerProps>(p => {
-  const props = mergeProps(defaultProps, p)
-  const controllable = useNewControllableValue({
-    value: props.value,
-    defaultValue: props.defaultValue,
-    onChange: props.onConfirm,
-  })
-  const value = controllable[0] as PickerValue[]
-  const setValue = controllable[1]
-
-  const [innerValue, setInnerValue] = useState<PickerValue[]>(value)
-  useEffect(() => {
-    if (!props.visible) {
-      setInnerValue(value)
-    }
-  }, [props.visible])
-  useEffect(() => {
-    if (!props.visible) {
-      setInnerValue(value)
-    }
-  }, [value])
-
-  const columns = useMemo(() => {
-    const columns =
-      typeof props.columns === 'function'
-        ? props.columns(innerValue)
-        : props.columns
-    return columns.map(column =>
-      column.map(item =>
-        typeof item === 'string'
-          ? {
-              label: item,
-              value: item,
-            }
-          : item
-      )
+export const Picker = memo(
+  forwardRef<PickerRef, PickerProps>((p, ref) => {
+    const { locale } = useConfig()
+    const props = mergeProps(
+      defaultProps,
+      {
+        confirmText: locale.common.confirm,
+        cancelText: locale.common.cancel,
+      },
+      p
     )
-  }, [props.columns, innerValue])
 
-  const widget = (
-    <Popup
-      visible={props.visible}
-      position='bottom'
-      onMaskClick={() => {
-        props.onCancel?.()
-        props.onClose?.()
-      }}
-      getContainer={props.getContainer}
-      destroyOnClose
-      afterShow={props.afterShow}
-      afterClose={props.afterClose}
-      onClick={props.onClick}
-    >
-      <div
-        className={classNames(classPrefix, props.className)}
-        style={props.style}
-      >
+    const [visible, setVisible] = usePropsValue({
+      value: props.visible,
+      defaultValue: false,
+      onChange: v => {
+        if (v === false) {
+          props.onClose?.()
+        }
+      },
+    })
+
+    const actions: PickerActions = {
+      toggle: () => {
+        setVisible(v => !v)
+      },
+      open: () => {
+        setVisible(true)
+      },
+      close: () => {
+        setVisible(false)
+      },
+    }
+
+    useImperativeHandle(ref, () => actions)
+
+    const [value, setValue] = usePropsValue({
+      ...props,
+      onChange: val => {
+        const extend = generateColumnsExtend(props.columns, val)
+        props.onConfirm?.(val, extend)
+      },
+    })
+
+    const extend = useColumnsExtend(props.columns, value)
+
+    const [innerValue, setInnerValue] = useState<PickerValue[]>(value)
+    useEffect(() => {
+      if (innerValue !== value) {
+        setInnerValue(value)
+      }
+    }, [visible])
+    useEffect(() => {
+      if (!visible) {
+        setInnerValue(value)
+      }
+    }, [value])
+
+    const onChange = useMemoizedFn((val, ext) => {
+      setInnerValue(val)
+      if (visible) {
+        props.onSelect?.(val, ext)
+      }
+    })
+
+    const pickerElement = withNativeProps(
+      props,
+      <div className={classPrefix}>
         <div className={`${classPrefix}-header`}>
           <a
+            role='button'
             className={`${classPrefix}-header-button`}
             onClick={() => {
               props.onCancel?.()
-              props.onClose?.()
+              setVisible(false)
             }}
           >
             {props.cancelText}
           </a>
+          <div className={`${classPrefix}-header-title`}>{props.title}</div>
           <a
-            className={`${classPrefix}-header-button`}
+            role='button'
+            className={classNames(
+              `${classPrefix}-header-button`,
+              props.loading && `${classPrefix}-header-button-disabled`
+            )}
             onClick={() => {
-              setValue(innerValue)
-              props.onClose?.()
+              if (props.loading) return
+              setValue(innerValue, true)
+              setVisible(false)
             }}
+            aria-disabled={props.loading}
           >
             {props.confirmText}
           </a>
         </div>
-        <div className={`${classPrefix}-columns`}>
-          {columns.map((column, index) => (
-            <Column
-              key={index}
-              column={column}
-              value={innerValue[index]}
-              onSelect={val => {
-                setInnerValue(prev => {
-                  const nextValue = [...prev]
-                  nextValue[index] = val
-                  props.onSelect?.(nextValue)
-                  return nextValue
-                })
-              }}
-            />
-          ))}
-          <div className={`${classPrefix}-mask ${classPrefix}-mask-top`} />
-          <div className={`${classPrefix}-mask ${classPrefix}-mask-bottom`} />
+        <div className={`${classPrefix}-body`}>
+          <PickerView
+            loading={props.loading}
+            loadingContent={props.loadingContent}
+            columns={props.columns}
+            renderLabel={props.renderLabel}
+            value={innerValue}
+            mouseWheel={props.mouseWheel}
+            onChange={onChange}
+          />
         </div>
       </div>
-    </Popup>
-  )
+    )
 
-  const items = useMemo(() => {
-    return value.map((v, index) => {
-      const column = columns[index]
-      if (!column) return null
-      return column.find(item => item.value === v) ?? null
-    })
-  }, [value, columns])
+    const popupElement = (
+      <Popup
+        style={props.popupStyle}
+        className={classNames(`${classPrefix}-popup`, props.popupClassName)}
+        visible={visible}
+        position='bottom'
+        onMaskClick={() => {
+          if (!props.closeOnMaskClick) return
+          props.onCancel?.()
+          setVisible(false)
+        }}
+        getContainer={props.getContainer}
+        destroyOnClose={props.destroyOnClose}
+        afterShow={props.afterShow}
+        afterClose={props.afterClose}
+        onClick={props.onClick}
+        forceRender={props.forceRender}
+        stopPropagation={props.stopPropagation}
+      >
+        {pickerElement}
+        <SafeArea position='bottom' />
+      </Popup>
+    )
 
-  return (
-    <>
-      {widget}
-      {props.children?.(items)}
-    </>
-  )
-})
+    return (
+      <>
+        {popupElement}
+        {props.children?.(extend.items, actions)}
+      </>
+    )
+  })
+)
+
+Picker.displayName = 'Picker'

@@ -1,31 +1,87 @@
+import { DownFill } from 'antd-mobile-icons'
 import classNames from 'classnames'
-import React, { FC } from 'react'
+import type { FC, ReactNode } from 'react'
+import React from 'react'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
+import { useShouldRender } from '../../utils/should-render'
+import { mergeProp, mergeProps } from '../../utils/with-default-props'
+import { useConfig } from '../config-provider'
+import { IconContext } from './context'
 
-const classPrefix = `am-dropdown-item`
+const classPrefix = `adm-dropdown-item`
 
-export interface DropdownItemProps {
+export type DropdownItemProps = {
   key: string
-  title: React.ReactNode
+  title: ReactNode
   active?: boolean
   highlight?: boolean
+  forceRender?: boolean
+  destroyOnClose?: boolean
   onClick?: (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => void
-  className?: string
-  style?: React.CSSProperties
-}
+  arrowIcon?: ReactNode
+  /**
+   * @deprecated use `arrowIcon` instead
+   */
+  arrow?: ReactNode
+  children?: ReactNode
+} & NativeProps
 
 const Item: FC<DropdownItemProps> = props => {
-  const cls = classNames(classPrefix, props.className, {
-    [`${classPrefix}-active`]: props.active,
-    [`${classPrefix}-highlight`]: props.highlight,
+  const { dropdown: componentConfig = {} } = useConfig()
+  const mergedProps = mergeProps(componentConfig, props)
+  const { active, highlight, onClick, title } = mergedProps
+  const cls = classNames(classPrefix, {
+    [`${classPrefix}-active`]: active,
+    [`${classPrefix}-highlight`]: highlight ?? active,
   })
 
-  return (
-    <div className={cls} style={props.style} onClick={props.onClick}>
+  const contextArrowIcon = React.useContext(IconContext)
+  const mergedArrowIcon = mergeProp(
+    <DownFill />,
+    contextArrowIcon,
+    mergedProps.arrow,
+    mergedProps.arrowIcon
+  )
+
+  return withNativeProps(
+    props,
+    <div className={cls} onClick={onClick}>
       <div className={`${classPrefix}-title`}>
-        <span>{props.title}</span>
+        <span className={`${classPrefix}-title-text`}>{title}</span>
+        <span
+          className={classNames(`${classPrefix}-title-arrow`, {
+            [`${classPrefix}-title-arrow-active`]: active,
+          })}
+        >
+          {mergedArrowIcon}
+        </span>
       </div>
     </div>
   )
 }
 
 export default Item
+
+type DropdownItemChildrenWrapProps = {
+  onClick?: () => void
+} & Pick<
+  DropdownItemProps,
+  'active' | 'forceRender' | 'destroyOnClose' | 'children'
+>
+export const ItemChildrenWrap: FC<DropdownItemChildrenWrapProps> = props => {
+  const { active = false } = props
+  const shouldRender = useShouldRender(
+    active,
+    props.forceRender,
+    props.destroyOnClose
+  )
+  const cls = classNames(`${classPrefix}-content`, {
+    [`${classPrefix}-content-hidden`]: !active,
+  })
+
+  return shouldRender ? (
+    <div className={cls} onClick={props.onClick}>
+      {props.children}
+    </div>
+  ) : null
+}

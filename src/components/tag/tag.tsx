@@ -1,20 +1,34 @@
-import React, { CSSProperties, FC } from 'react'
+import React from 'react'
+import type { FC, CSSProperties, ReactNode } from 'react'
 import { mergeProps } from '../../utils/with-default-props'
-import { ElementProps } from '../../utils/element-props'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
 import classNames from 'classnames'
 
-const classPrefix = `am-tag`
+const classPrefix = `adm-tag`
 
 const colorRecord: Record<string, string> = {
-  default: '#666666',
-  primary: '#1677FF',
+  default: 'var(--adm-color-text-secondary, #666666)',
+  primary: 'var(--adm-color-primary, #1677ff)',
+  success: 'var(--adm-color-success, #00b578)',
+  warning: 'var(--adm-color-warning, #ff8f1f)',
+  danger: 'var(--adm-color-danger, #ff3141)',
 }
 
 export type TagProps = {
-  color?: 'default' | 'primary' | string
+  color?:
+    | 'default'
+    | 'primary'
+    | 'success'
+    | 'warning'
+    | 'danger'
+    | (string & {})
   fill?: 'solid' | 'outline'
   round?: boolean
-} & ElementProps
+  onClick?: (e: React.MouseEvent<HTMLSpanElement, MouseEvent>) => void
+  children?: ReactNode
+} & NativeProps<
+  '--border-color' | '--background-color' | '--text-color' | '--border-radius'
+>
 
 const defaultProps = {
   color: 'default',
@@ -27,22 +41,22 @@ export const Tag: FC<TagProps> = p => {
   const color = colorRecord[props.color] ?? props.color
 
   const style: CSSProperties & {
-    '--color': string
+    '--border-color': string
+    '--text-color': string
+    '--background-color': string
   } = {
-    '--color': color,
-    ...props.style,
+    '--border-color': color,
+    '--text-color': props.fill === 'outline' ? color : '#ffffff',
+    '--background-color': props.fill === 'outline' ? 'transparent' : color,
   }
-  return (
+  return withNativeProps(
+    props,
     <span
       style={style}
-      className={classNames(
-        classPrefix,
-        {
-          [`${classPrefix}-round`]: props.round,
-          [`${classPrefix}-outline`]: props.fill === 'outline',
-        },
-        props.className
-      )}
+      onClick={props.onClick}
+      className={classNames(classPrefix, {
+        [`${classPrefix}-round`]: props.round,
+      })}
     >
       {props.children}
     </span>

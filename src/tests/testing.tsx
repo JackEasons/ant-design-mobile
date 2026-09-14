@@ -1,8 +1,13 @@
 import '@testing-library/jest-dom/extend-expect'
-import { render, RenderOptions, RenderResult } from '@testing-library/react'
-import { toHaveNoViolations, axe } from 'jest-axe'
+import {
+  act,
+  fireEvent,
+  render,
+  RenderOptions,
+  RenderResult,
+} from '@testing-library/react'
+import { axe, toHaveNoViolations } from 'jest-axe'
 import * as React from 'react'
-import { RunOptions } from 'axe-core'
 
 expect.extend(toHaveNoViolations)
 
@@ -63,23 +68,19 @@ export interface TestOptions extends Omit<RenderOptions, 'wrapper'> {
 export const customRender = (
   ui: UI,
   { wrapper: Wrapper = AllTheProviders, ...options }: TestOptions = {}
-): RenderResult => render(<Wrapper>{ui}</Wrapper>, options)
+): RenderResult => {
+  const renderResult = render(<Wrapper>{ui}</Wrapper>, options)
+  return {
+    ...renderResult,
+    rerender: ui => renderResult.rerender(<Wrapper>{ui}</Wrapper>),
+  }
+}
 
 // re-export everything
 export * from '@testing-library/react'
-export {
-  act as invoke,
-  renderHook,
-  RenderHookOptions,
-  RenderHookResult,
-} from '@testing-library/react-hooks'
-
 export { default as userEvent } from '@testing-library/user-event'
-
 // override render method
 export { customRender as render }
-
-type TestA11YOptions = TestOptions & { axeOptions?: RunOptions }
 
 /**
  * Validates against common a11y mistakes.
@@ -104,15 +105,93 @@ type TestA11YOptions = TestOptions & { axeOptions?: RunOptions }
  *
  * @see https://github.com/nickcolley/jest-axe#testing-react-with-react-testing-library
  */
-export const testA11y = async (
-  ui: UI | Element,
-  { axeOptions, ...options }: TestA11YOptions = {}
-) => {
-  const container = React.isValidElement(ui)
-    ? customRender(ui, options).container
-    : ui
+export const testA11y = async (ui: UI | Element) => {
+  const container = React.isValidElement(ui) ? customRender(ui).container : ui
 
-  const results = await axe(container, axeOptions)
+  const results = await axe(container as Element)
 
   expect(results).toHaveNoViolations()
+}
+
+export const sleep = (time: number) =>
+  new Promise<void>(resolve => setTimeout(resolve, time))
+
+export const actSleep = (time: number) => {
+  return act(() => sleep(time))
+}
+
+export const waitFakeTimers = async () => {
+  for (let i = 0; i < 10; i += 1) {
+    await act(async () => {
+      jest.advanceTimersByTime(1000)
+      await Promise.resolve()
+    })
+  }
+}
+
+export async function waitFakeTimer19(advanceTime = 1000) {
+  await act(async () => {
+    await Promise.resolve()
+  })
+  await act(async () => {
+    jest.advanceTimersByTime(advanceTime)
+  })
+}
+
+export const mockDrag = async (el: Element, options: any[], time?: number) => {
+  const [downOptions, ...moveOptions] = options
+  fireEvent.mouseDown(el, {
+    buttons: 1,
+    ...downOptions,
+  })
+  for (const item of moveOptions) {
+    fireEvent.mouseMove(el, {
+      buttons: 1,
+      ...item,
+    })
+
+    if (time) {
+      await sleep(time)
+    }
+  }
+  fireEvent.mouseUp(el)
+}
+
+/**
+ * Simulates a vertical drag with velocity — smaller duration means faster flick
+ *
+ * @param el       Target element
+ * @param from     Starting clientY
+ * @param to       Ending clientY
+ * @param duration Drag duration in ms
+ * @param steps    Number of mouseMove events
+ */
+export const mockTimedDrag = (
+  el: Element,
+  from: number,
+  to: number,
+  duration: number,
+  steps: number,
+) => {
+  const dispatch = (
+    type: 'mousedown' | 'mousemove' | 'mouseup',
+    clientY: number,
+    timeStamp: number,
+  ) => {
+    const ev = new MouseEvent(type, {
+      clientY,
+      buttons: 1,
+      bubbles: true,
+      cancelable: true,
+    })
+    Object.defineProperty(ev, 'timeStamp', { value: timeStamp, configurable: true })
+    fireEvent(el, ev)
+  }
+
+  dispatch('mousedown', from, 1000)
+  for (let i = 1; i <= steps; i++) {
+    const progress = i / steps
+    dispatch('mousemove', from + (to - from) * progress, 1000 + duration * progress)
+  }
+  dispatch('mouseup', to, 1000 + duration)
 }

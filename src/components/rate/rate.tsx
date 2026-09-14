@@ -1,60 +1,109 @@
-import React from 'react'
+import React, { useRef } from 'react'
+import type { FC, ReactNode } from 'react'
 import classNames from 'classnames'
-import { ElementProps } from '../../utils/element-props'
-import { withDefaultProps } from '../../utils/with-default-props'
-import { StarFilled } from '@ant-design/icons'
-import { useNewControllableValue } from '../../utils/use-controllable-value'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
+import { mergeProps } from '../../utils/with-default-props'
+import { usePropsValue } from '../../utils/use-props-value'
+import { Star } from './star'
+import { useDrag } from '@use-gesture/react'
+import { bound } from '../../utils/bound'
 
-const classPrefix = `am-rate`
+const classPrefix = `adm-rate`
 
 export type RateProps = {
   allowClear?: boolean
   allowHalf?: boolean
-  character?: React.ReactNode
+  character?: ReactNode
   count?: number
   defaultValue?: number
-  readonly?: boolean
+  readOnly?: boolean
   value?: number
   onChange?: (value: number) => void
-} & ElementProps<'--star-size' | '--active-color'>
+} & NativeProps<
+  | '--star-size'
+  | '--active-color'
+  | '--inactive-color'
+  | '--inactive-color-half'
+>
 
 const defaultProps = {
   count: 5,
   allowHalf: false,
-  character: <StarFilled />,
+  character: <Star />,
   defaultValue: 0,
-  readonly: false,
+  readOnly: false,
   allowClear: true,
 }
 
-export const Rate = withDefaultProps(defaultProps)<RateProps>(props => {
-  const [value, setValue] = useNewControllableValue(props)
+export const Rate: FC<RateProps> = p => {
+  const props = mergeProps(defaultProps, p)
+  const [value, setValue] = usePropsValue(props)
+
+  const containerRef = useRef<HTMLDivElement>(null)
   const starList = Array(props.count).fill(null)
+
   function renderStar(v: number, half: boolean) {
     return (
       <div
         className={classNames(`${classPrefix}-star`, {
           [`${classPrefix}-star-active`]: value >= v,
           [`${classPrefix}-star-half`]: half,
-          [`${classPrefix}-star-readonly`]: props.readonly,
+          [`${classPrefix}-star-readonly`]: props.readOnly,
         })}
-        onClick={() => {
-          if (props.readonly) return
-          if (props.allowClear && value === v) {
-            setValue(0)
-          } else {
-            setValue(v)
-          }
-        }}
+        role='radio'
+        aria-checked={value >= v}
+        aria-label={'' + v}
       >
         {props.character}
       </div>
     )
   }
-  return (
+
+  const bind = useDrag(
+    state => {
+      if (props.readOnly) return
+      const {
+        xy: [clientX],
+        tap,
+      } = state
+      const container = containerRef.current
+      if (!container) return
+      const rect = container.getBoundingClientRect()
+      const rawValue = ((clientX - rect.left) / rect.width) * props.count
+
+      const ceiledValue = props.allowHalf
+        ? Math.ceil(rawValue * 2) / 2
+        : Math.ceil(rawValue)
+
+      const boundValue = bound(ceiledValue, 0, props.count)
+
+      if (tap) {
+        if (props.allowClear && boundValue === value) {
+          setValue(0)
+          return
+        }
+      }
+
+      setValue(boundValue)
+    },
+    {
+      axis: 'x',
+      pointer: {
+        touch: true,
+      },
+      filterTaps: true,
+    }
+  )
+  return withNativeProps(
+    props,
     <div
-      style={props.style}
-      className={classNames(classPrefix, props.className)}
+      className={classNames(classPrefix, {
+        [`${classPrefix}-half`]: props.allowHalf,
+      })}
+      role='radiogroup'
+      aria-readonly={props.readOnly}
+      ref={containerRef}
+      {...bind()}
     >
       {starList.map((_, i) => (
         <div key={i} className={classNames(`${classPrefix}-box`)}>
@@ -64,4 +113,4 @@ export const Rate = withDefaultProps(defaultProps)<RateProps>(props => {
       ))}
     </div>
   )
-})
+}

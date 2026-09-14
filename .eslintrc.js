@@ -1,4 +1,5 @@
 module.exports = {
+  ignorePatterns: ['/*', '!/src', '/src/**/*.js'],
   'env': {
     'browser': true,
     'es6': true,
@@ -22,6 +23,7 @@ module.exports = {
     '@typescript-eslint/no-explicit-any': 'off',
     '@typescript-eslint/no-empty-interface': 'off',
     '@typescript-eslint/no-use-before-define': 'off',
+    '@typescript-eslint/no-inferrable-types': 'off',
     '@typescript-eslint/camelcase': 'off',
     'react/prop-types': 'off',
     'react/jsx-no-target-blank': 'off',
@@ -31,6 +33,12 @@ module.exports = {
     '@typescript-eslint/no-empty-function': 'off',
     'no-inner-declarations': 'off',
     'react/no-unescaped-entities': 'off',
+    '@typescript-eslint/no-unused-vars': [
+      'warn',
+      {
+        ignoreRestSiblings: true,
+      },
+    ],
     'no-empty': [
       'error',
       {
@@ -41,6 +49,15 @@ module.exports = {
       'error',
       {
         checkLoops: false,
+      },
+    ],
+    '@typescript-eslint/ban-types': [
+      'error',
+      {
+        extendDefaults: true,
+        types: {
+          '{}': false,
+        },
       },
     ],
     // 下面的是临时规则
@@ -56,6 +73,15 @@ module.exports = {
       'files': ['**/demos/**/*'],
       'rules': {
         'react/react-in-jsx-scope': 'off',
+        'react/display-name': 'off',
+      },
+    },
+    {
+      'files': ['**/tests/**/*'],
+      'rules': {
+        'react/react-in-jsx-scope': 'off',
+        'react/display-name': 'off',
+        '@typescript-eslint/no-unused-vars': 'off',
       },
     },
   ],

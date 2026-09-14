@@ -1,13 +1,13 @@
-@class-prefix-index-bar: ~'am-index-bar';
+@class-prefix-index-bar: ~'adm-index-bar';
 
 .@{class-prefix-index-bar} {
-  --color: var(--am-color-text);
+  --color: var(--adm-color-text);
   overflow: hidden;
 
   height: 100%;
   position: relative;
-  background-color: var(--am-color-white);
-  --sticy-offset-top: 0;
+  background-color: var(--adm-color-background);
+  --sticky-offset-top: 0;
 
   &-body {
     overflow: scroll;
@@ -25,9 +25,9 @@
       justify-content: center;
       height: 35px;
       padding: 0 12px;
-      color: var(--am-color-weak);
-      font-size: 13px;
-      background-color: #f5f5f5;
+      color: var(--adm-color-weak);
+      font-size: var(--adm-font-size-main);
+      background-color: var(--adm-color-fill-content);
     }
   }
 
@@ -36,34 +36,37 @@
     top: 50%;
     right: 0;
     transform: translateY(-50%);
-    z-index: 3;
+    z-index: 910;
     overflow: visible;
-    color: var(--am-color-weak);
-    font-size: 12px;
+    color: var(--adm-color-weak);
+    font-size: var(--adm-font-size-4);
     user-select: none;
     touch-action: none;
 
     &-bubble {
       position: absolute;
       top: 50%;
-      right: 42px;
+      right: 60px;
       width: 47px;
       height: 47px;
-      color: var(--am-color-white);
+      color: var(--adm-color-text-light-solid);
       font-size: 25px;
       line-height: 47px;
       text-align: center;
-      background: var(--am-color-light);
+      background: var(--adm-color-light);
       border-radius: 50%;
       transform: translateY(-50%);
     }
 
     &-row {
       cursor: pointer;
-      width: 100%;
+      width: auto;
       text-align: right;
       position: relative;
       padding: 0 12px;
+      > * {
+        pointer-events: none;
+      }
     }
 
     &-item {
@@ -76,8 +79,8 @@
     }
 
     &-item-active {
-      color: #fff;
-      background-color: var(--am-color-primary);
+      color: var(--adm-color-text-light-solid);
+      background-color: var(--adm-color-primary);
       border-radius: 50%;
     }
 
@@ -89,7 +92,8 @@
   &-sticky {
     .@{class-prefix-index-bar}-anchor-title {
       position: sticky;
-      top: var(--sticy-offset-top);
+      z-index: 900;
+      top: var(--sticky-offset-top);
       left: 0;
     }
   }

@@ -1,45 +1,55 @@
 import React from 'react'
+import type { FC, ReactNode } from 'react'
 import classNames from 'classnames'
-import { StepProps } from './step'
-import { withDefaultProps } from '../../utils/with-default-props'
+import type { StepProps } from './step'
+import { mergeProps } from '../../utils/with-default-props'
+import { NativeProps, withNativeProps } from '../../utils/native-props'
 
-const classPrefix = `am-steps`
-const stepClassPrefix = `am-step`
+const classPrefix = `adm-steps`
+const stepClassPrefix = `adm-step`
 
 const defaultIcon = <span className={`${stepClassPrefix}-icon-dot`} />
 
 type Direction = 'horizontal' | 'vertical'
 
-export interface StepsProps {
+export type StepsProps = {
   current?: number
   direction?: Direction
-}
+  children?: ReactNode
+} & NativeProps<
+  | '--title-font-size'
+  | '--description-font-size'
+  | '--indicator-margin-right'
+  | '--icon-size'
+>
 
 const defaultProps = {
   current: 0,
   direction: 'horizontal',
 }
 
-export const Steps = withDefaultProps(defaultProps)<StepsProps>(props => {
+export const Steps: FC<StepsProps> = p => {
+  const props = mergeProps(defaultProps, p)
   const { direction, current } = props
   const classString = classNames(classPrefix, `${classPrefix}-${direction}`)
 
-  return (
+  return withNativeProps(
+    props,
     <div className={classString}>
       {React.Children.map(props.children, (child, index) => {
-        if (!React.isValidElement(child)) {
+        if (!React.isValidElement<StepProps>(child)) {
           return child
         }
-        const props = child.props as StepProps
-        let status = props.status || 'wait'
+        const childProps = child.props
+        let status = childProps.status || 'wait'
 
         if (index < current) {
-          status = props.status || 'finish'
+          status = childProps.status || 'finish'
         } else if (index === current) {
-          status = props.status || 'process'
+          status = childProps.status || 'process'
         }
 
-        const icon = props.icon ?? defaultIcon
+        const icon = childProps.icon ?? defaultIcon
 
         return React.cloneElement(child, {
           status,
@@ -48,4 +58,4 @@ export const Steps = withDefaultProps(defaultProps)<StepsProps>(props => {
       })}
     </div>
   )
-})
+}

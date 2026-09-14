@@ -1,102 +1,142 @@
-import React, { FC, ReactNode } from 'react'
-import { mergeProps } from '../../utils/with-default-props'
 import classNames from 'classnames'
-import Mask from '../mask'
-import { Action, DialogActionButton } from './dialog-action-button'
+import type { FC, ReactNode } from 'react'
+import React from 'react'
+import { NativeProps } from '../../utils/native-props'
+import { mergeProps } from '../../utils/with-default-props'
+import AutoCenter from '../auto-center'
+import CenterPopup, { CenterPopupProps } from '../center-popup'
 import Image from '../image'
-import Space from '../space'
+import { Action, DialogActionButton } from './dialog-action-button'
 
-const classPrefix = `am-dialog`
-
-export interface DialogProps {
-  afterClose?: () => void
+export type DialogProps = Pick<
+  CenterPopupProps,
+  | 'afterClose'
+  | 'afterShow'
+  | 'bodyClassName'
+  | 'bodyStyle'
+  | 'destroyOnClose'
+  | 'disableBodyScroll'
+  | 'forceRender'
+  | 'getContainer'
+  | 'maskClassName'
+  | 'maskStyle'
+  | 'stopPropagation'
+  | 'visible'
+> & {
   image?: string
   header?: ReactNode
-  // waitImageLoad?: boolean
   title?: ReactNode
   content?: ReactNode
   actions?: (Action | Action[])[]
   onAction?: (action: Action, index: number) => void | Promise<void>
-  closeOnAction?: boolean
   onClose?: () => void
+  closeOnAction?: boolean
   closeOnMaskClick?: boolean
-  visible?: boolean
-  getContainer?: HTMLElement | (() => HTMLElement) | undefined
-  bodyStyle?: React.CSSProperties
-  bodyClassName?: string
-  maskStyle?: React.CSSProperties
-  maskClassName?: string
-}
+} & NativeProps<
+    | '--background-color'
+    | '--border-radius'
+    | '--max-width'
+    | '--min-width'
+    | '--z-index'
+  >
 
 const defaultProps = {
-  actions: [],
+  actions: [] as Action[],
   closeOnAction: false,
   closeOnMaskClick: false,
+  getContainer: null,
 }
 
 export const Dialog: FC<DialogProps> = p => {
   const props = mergeProps(defaultProps, p)
 
-  return (
-    <Mask
-      visible={props.visible}
-      destroyOnClose
-      getContainer={props.getContainer}
-      afterClose={props.afterClose}
-      onMaskClick={props.closeOnMaskClick ? props.onClose : undefined}
-      style={props.maskStyle}
-      className={classNames(`${classPrefix}-mask`, props.maskClassName)}
-    >
-      <div onClick={e => e.stopPropagation()} className={`${classPrefix}-wrap`}>
-        {!!props.image && (
+  const element = (
+    <>
+      {!!props.image && (
+        <div className={cls('image-container')}>
           <Image src={props.image} alt='dialog header image' width='100%' />
+        </div>
+      )}
+      {!!props.header && (
+        <div className={cls('header')}>
+          <AutoCenter>{props.header}</AutoCenter>
+        </div>
+      )}
+      {!!props.title && <div className={cls('title')}>{props.title}</div>}
+      <div
+        className={classNames(
+          cls('content'),
+          !props.content && cls('content-empty')
         )}
-        <div
-          style={props.bodyStyle}
-          className={classNames(`${classPrefix}-body`, props.bodyClassName)}
-        >
-          <Space direction='vertical' block>
-            {!!props.header && (
-              <div className={`${classPrefix}-body-header-wrapper`}>
-                <div className={`${classPrefix}-body-header`}>
-                  {props.header}
-                </div>
-              </div>
-            )}
-            {!!props.title && (
-              <div className={`${classPrefix}-body-title`}>{props.title}</div>
-            )}
-            {!!props.content && (
-              <div className={`${classPrefix}-body-message-wrapper`}>
-                <div className={`${classPrefix}-body-message`}>
-                  {props.content}
-                </div>
-              </div>
-            )}
-          </Space>
-        </div>
-        <div className={`${classPrefix}-footer`}>
-          {props.actions.map((row, index) => {
-            const actions = Array.isArray(row) ? row : [row]
-            return (
-              <div className={`${classPrefix}-action-row`} key={index}>
-                {actions.map((action, index) => (
-                  <DialogActionButton
-                    key={action.key}
-                    action={action}
-                    onAction={async () => {
-                      await props.onAction?.(action, index)
-                      if (props.closeOnAction) {
-                        props.onClose?.()
-                      }
-                    }}
-                  />
-                ))}
-              </div>
-            )
-          })}
-        </div>
+      >
+        {typeof props.content === 'string' ? (
+          <AutoCenter>{props.content}</AutoCenter>
+        ) : (
+          props.content
+        )}
       </div>
-    </Mask>
+      <div className={cls('footer')}>
+        {props.actions.map((row, index) => {
+          const actions = Array.isArray(row) ? row : [row]
+          return (
+            <div className={cls('action-row')} key={index}>
+              {actions.map((action, index) => (
+                <DialogActionButton
+                  key={action.key}
+                  action={action}
+                  onAction={async () => {
+                    await Promise.all([
+                      action.onClick?.(),
+                      props.onAction?.(action, index),
+                    ])
+                    if (props.closeOnAction) {
+                      props.onClose?.()
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          )
+        })}
+      </div>
+    </>
   )
+
+  return (
+    <CenterPopup
+      className={classNames(cls(), props.className)}
+      style={props.style}
+      afterClose={props.afterClose}
+      afterShow={props.afterShow}
+      onMaskClick={
+        props.closeOnMaskClick
+          ? () => {
+              props.onClose?.()
+            }
+          : undefined
+      }
+      visible={props.visible}
+      getContainer={props.getContainer}
+      bodyStyle={props.bodyStyle}
+      bodyClassName={classNames(
+        cls('body'),
+        props.image && cls('with-image'),
+        props.bodyClassName
+      )}
+      maskStyle={props.maskStyle}
+      maskClassName={props.maskClassName}
+      stopPropagation={props.stopPropagation}
+      disableBodyScroll={props.disableBodyScroll}
+      destroyOnClose={props.destroyOnClose}
+      forceRender={props.forceRender}
+      role='dialog'
+      aria-label={props['aria-label']}
+    >
+      {element}
+    </CenterPopup>
+  )
+}
+
+function cls(name: string = '') {
+  return 'adm-dialog' + (name && '-') + name
 }

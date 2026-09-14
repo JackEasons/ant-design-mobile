@@ -1,23 +1,21 @@
-.am-collapse {
+@class-prefix-collapse: ~'adm-collapse';
+
+.@{class-prefix-collapse} {
   &-panel-header {
-    &-disabled {
-      color: var(--am-color-light);
-      cursor: not-allowed;
-      .am-collapse-arrow {
-        color: var(--am-color-light);
-      }
+    & .adm-list-item-content-main {
+      padding: 12px 0;
     }
   }
   &-arrow {
     transform: rotate(0deg);
     &-active {
-      transform: rotate(90deg);
+      transform: rotate(-180deg);
     }
-    transition: all ease 0.2s;
+    transition: all ease 0.3s;
   }
   &-panel-content {
-    font-size: var(--am-font-size-main);
-    color: var(--am-color-weak);
+    font-size: var(--adm-font-size-main);
+    color: var(--adm-color-weak);
     overflow: hidden;
   }
 }
